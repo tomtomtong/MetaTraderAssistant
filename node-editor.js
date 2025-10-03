@@ -36,6 +36,18 @@ class NodeEditor {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Check for trigger button click
+    for (let node of this.nodes) {
+      if (node.type === 'trigger-manual' && node.params.enabled) {
+        const buttonPos = this.getTriggerButtonPos(node);
+        if (x >= buttonPos.x && x <= buttonPos.x + buttonPos.width &&
+            y >= buttonPos.y && y <= buttonPos.y + buttonPos.height) {
+          this.executeTrigger(node);
+          return;
+        }
+      }
+    }
+
     // Check for output socket click (start connection)
     for (let node of this.nodes) {
       const socket = this.getOutputSocketPos(node);
@@ -153,6 +165,25 @@ class NodeEditor {
 
   getNodeConfig(type) {
     const configs = {
+      'trigger-manual': {
+        title: 'Manual Trigger',
+        inputs: [],
+        outputs: ['trigger'],
+        params: { 
+          enabled: true,
+          description: 'Click to execute'
+        }
+      },
+      'trigger-period': {
+        title: 'Period Trigger',
+        inputs: [],
+        outputs: ['trigger'],
+        params: { 
+          enabled: true,
+          interval: 60,
+          unit: 'seconds'
+        }
+      },
       'market-data': {
         title: 'Market Data',
         inputs: [],
@@ -329,10 +360,11 @@ class NodeEditor {
   drawNode(node) {
     const ctx = this.ctx;
     const isSelected = node === this.selectedNode;
+    const isTrigger = node.type.startsWith('trigger-');
 
     // Node body
-    ctx.fillStyle = '#2d2d2d';
-    ctx.strokeStyle = isSelected ? '#4CAF50' : '#444';
+    ctx.fillStyle = isTrigger ? '#2d3d2d' : '#2d2d2d';
+    ctx.strokeStyle = isSelected ? '#4CAF50' : (isTrigger ? '#66BB6A' : '#444');
     ctx.lineWidth = isSelected ? 3 : 2;
     ctx.beginPath();
     ctx.roundRect(node.x, node.y, node.width, node.height, 8);
@@ -340,16 +372,26 @@ class NodeEditor {
     ctx.stroke();
 
     // Title bar
-    ctx.fillStyle = '#1e1e1e';
+    ctx.fillStyle = isTrigger ? '#1e2e1e' : '#1e1e1e';
     ctx.beginPath();
     ctx.roundRect(node.x, node.y, node.width, 30, [8, 8, 0, 0]);
     ctx.fill();
 
     // Title text
-    ctx.fillStyle = '#e0e0e0';
+    ctx.fillStyle = isTrigger ? '#A5D6A7' : '#e0e0e0';
     ctx.font = 'bold 12px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(node.title, node.x + node.width / 2, node.y + 20);
+    
+    // Draw trigger button for manual trigger
+    if (node.type === 'trigger-manual' && node.params.enabled) {
+      this.drawTriggerButton(node);
+    }
+    
+    // Draw status indicator for period trigger
+    if (node.type === 'trigger-period') {
+      this.drawPeriodStatus(node);
+    }
 
     // Input sockets
     ctx.fillStyle = '#64B5F6';
@@ -483,6 +525,120 @@ class NodeEditor {
     this.nodes = [];
     this.connections = [];
     this.selectedNode = null;
+    this.stopAllPeriodTriggers();
+  }
+
+  // Trigger-specific methods
+  getTriggerButtonPos(node) {
+    return {
+      x: node.x + 10,
+      y: node.y + node.height - 35,
+      width: node.width - 20,
+      height: 25
+    };
+  }
+
+  drawTriggerButton(node) {
+    const ctx = this.ctx;
+    const pos = this.getTriggerButtonPos(node);
+    
+    // Button background
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath();
+    ctx.roundRect(pos.x, pos.y, pos.width, pos.height, 4);
+    ctx.fill();
+    
+    // Button text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('▶ EXECUTE', pos.x + pos.width / 2, pos.y + 16);
+  }
+
+  drawPeriodStatus(node) {
+    const ctx = this.ctx;
+    const x = node.x + node.width - 25;
+    const y = node.y + 10;
+    
+    // Status indicator
+    const isActive = node.params.enabled && node.intervalId;
+    ctx.fillStyle = isActive ? '#4CAF50' : '#666';
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pulse effect for active triggers
+    if (isActive) {
+      const pulse = Math.sin(Date.now() / 500) * 0.3 + 0.7;
+      ctx.strokeStyle = `rgba(76, 175, 80, ${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  executeTrigger(node) {
+    if (!node.params.enabled) return;
+    
+    // Visual feedback
+    node.lastTriggerTime = Date.now();
+    
+    // Find all connected nodes and execute the flow
+    const connectedNodes = this.connections
+      .filter(c => c.from === node)
+      .map(c => c.to);
+    
+    if (window.onTriggerExecute) {
+      window.onTriggerExecute(node, connectedNodes);
+    }
+    
+    console.log('Trigger executed:', node.title, 'Connected nodes:', connectedNodes.length);
+  }
+
+  startPeriodTrigger(node) {
+    if (node.type !== 'trigger-period' || !node.params.enabled) return;
+    
+    // Stop existing interval if any
+    this.stopPeriodTrigger(node);
+    
+    // Calculate interval in milliseconds
+    let intervalMs = node.params.interval * 1000; // default: seconds
+    if (node.params.unit === 'minutes') {
+      intervalMs = node.params.interval * 60 * 1000;
+    } else if (node.params.unit === 'hours') {
+      intervalMs = node.params.interval * 60 * 60 * 1000;
+    }
+    
+    // Start new interval
+    node.intervalId = setInterval(() => {
+      this.executeTrigger(node);
+    }, intervalMs);
+    
+    console.log(`Period trigger started: ${node.params.interval} ${node.params.unit}`);
+  }
+
+  stopPeriodTrigger(node) {
+    if (node.intervalId) {
+      clearInterval(node.intervalId);
+      node.intervalId = null;
+    }
+  }
+
+  stopAllPeriodTriggers() {
+    this.nodes.forEach(node => {
+      if (node.type === 'trigger-period') {
+        this.stopPeriodTrigger(node);
+      }
+    });
+  }
+
+  updatePeriodTrigger(node) {
+    if (node.type === 'trigger-period' && node.params.enabled) {
+      this.startPeriodTrigger(node);
+    } else {
+      this.stopPeriodTrigger(node);
+    }
   }
 }
 

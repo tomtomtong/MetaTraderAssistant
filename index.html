@@ -31,6 +31,12 @@
         <h3>Node Library</h3>
         
         <div class="node-category">
+          <h4>Triggers</h4>
+          <button class="node-btn trigger-btn" data-type="trigger-manual">⚡ Manual Trigger</button>
+          <button class="node-btn trigger-btn" data-type="trigger-period">⏱️ Period Trigger</button>
+        </div>
+
+        <div class="node-category">
           <h4>Data Sources</h4>
           <button class="node-btn" data-type="market-data">Market Data</button>
           <button class="node-btn" data-type="constant">Constant Value</button>
@@ -147,6 +153,12 @@
         <div class="form-group">
           <label>Volume:</label>
           <input type="number" id="tradeVolume" step="0.01" min="0.01" value="0.1">
+          <div id="volumeLossInfo" class="volume-loss-info" style="display: none;">
+            <div class="loss-warning">
+              <span class="warning-icon">⚠️</span>
+              <span class="loss-text">Potential loss if price drops 1%: <span id="potentialLoss">$0.00</span></span>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label>Stop Loss (optional):</label>
@@ -164,6 +176,47 @@
     </div>
 
     <div id="messageBox" class="message-box"></div>
+
+    <!-- Volume Loss Reminder Modal -->
+    <div id="priceDropAlert" class="price-drop-alert" style="display: none;">
+      <h3>
+        <span class="alert-icon">⚠️</span>
+        Volume Loss Reminder
+      </h3>
+      <div class="alert-content">
+        <p>Potential loss if price drops 1% from current price:</p>
+        <div class="alert-details">
+          <div class="alert-detail-item">
+            <span>Symbol:</span>
+            <span id="alertSymbol">-</span>
+          </div>
+          <div class="alert-detail-item">
+            <span>Volume:</span>
+            <span id="alertVolume">-</span>
+          </div>
+          <div class="alert-detail-item">
+            <span>Entry Price:</span>
+            <span id="alertEntryPrice">-</span>
+          </div>
+          <div class="alert-detail-item">
+            <span>Current Price:</span>
+            <span id="alertCurrentPrice">-</span>
+          </div>
+          <div class="alert-detail-item">
+            <span>Price Change:</span>
+            <span id="alertPriceChange">-</span>
+          </div>
+          <div class="alert-detail-item">
+            <span>Current Loss:</span>
+            <span id="alertCurrentLoss">-</span>
+          </div>
+        </div>
+      </div>
+      <div class="alert-actions">
+        <button id="closeAlertBtn" class="btn btn-secondary">Close</button>
+        <button id="modifyPositionBtn" class="btn btn-primary">Modify Position</button>
+      </div>
+    </div>
   </div>
 
   <script src="symbol-input.js"></script>
