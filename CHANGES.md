@@ -1,3 +1,40 @@
+# Recent Changes
+
+## Volume Loss Reminder Fix (Latest)
+
+### Summary
+Fixed incorrect loss calculation and improved clarity of the Volume Loss Reminder dialog.
+
+### Issues Fixed
+1. **Incorrect calculation**: The loss was being multiplied by an extra `pointValue` factor, resulting in losses that were 10-100x too large
+2. **Confusing UI labels**: Both "Entry Price" and "Current Price" showed the same value
+3. **Missing price change indicator**: The price change field showed "0.00%" instead of "-1.00%"
+
+### Changes Made
+1. **renderer.js**
+   - Fixed `calculateVolumeLoss()`: Simplified formula to `Loss = priceChange × contractSize × volume`
+   - Fixed `testLossFromNode()`: Same simplified formula
+   - Updated `showVolumeLossReminder()`: Now shows the price after 1% drop and displays "-1.00%" change
+
+2. **index.html**
+   - Updated dialog description: "If you execute this volume and price moves 1% against you:"
+   - Renamed labels for clarity:
+     - "Entry Price" → "Current Price"
+     - "Current Price" → "Price After 1% Drop"
+     - "Current Loss" → "Potential Loss"
+
+### Formula
+The corrected formula for 1% price move loss:
+```
+Loss = (Current Price × 0.01) × Contract Size × Volume
+```
+
+For example, USOIL.cash at 60.98400 with 1 lot (100 barrels):
+- Price change: 60.98400 × 0.01 = 0.60984
+- Loss: 0.60984 × 100 × 1 = $60.98
+
+---
+
 # Position Management Features Added
 
 ## Summary

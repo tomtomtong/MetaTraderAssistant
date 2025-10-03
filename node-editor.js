@@ -116,11 +116,8 @@ class NodeEditor {
   }
 
   onKeyDown(e) {
-    // Delete selected node with Delete key only
-    if (e.key === 'Delete' && this.selectedNode) {
-      e.preventDefault();
-      this.deleteSelectedNode();
-    }
+    // Delete key functionality disabled - nodes cannot be deleted with Delete key
+    // This method is kept for potential future keyboard shortcuts
   }
 
   deleteSelectedNode() {

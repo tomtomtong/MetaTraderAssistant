@@ -2,6 +2,54 @@
 let isConnected = false;
 let nodeEditor = null;
 let symbolInput = null;
+let logEntries = [];
+
+// Override console methods to capture logs
+const originalConsole = {
+  log: console.log,
+  error: console.error,
+  warn: console.warn,
+  info: console.info
+};
+
+function addLogEntry(type, message) {
+  const timestamp = new Date().toLocaleTimeString();
+  const entry = {
+    timestamp,
+    type,
+    message: typeof message === 'object' ? JSON.stringify(message, null, 2) : String(message)
+  };
+  logEntries.push(entry);
+  
+  // Keep only last 100 entries
+  if (logEntries.length > 100) {
+    logEntries = logEntries.slice(-100);
+  }
+  
+  // Update log display if modal is open
+  updateLogDisplay();
+}
+
+// Override console methods
+console.log = (...args) => {
+  originalConsole.log(...args);
+  addLogEntry('info', args.join(' '));
+};
+
+console.error = (...args) => {
+  originalConsole.error(...args);
+  addLogEntry('error', args.join(' '));
+};
+
+console.warn = (...args) => {
+  originalConsole.warn(...args);
+  addLogEntry('warning', args.join(' '));
+};
+
+console.info = (...args) => {
+  originalConsole.info(...args);
+  addLogEntry('info', args.join(' '));
+};
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -24,6 +72,7 @@ function setupEventListeners() {
   // Toolbar buttons
   document.getElementById('connectBtn').addEventListener('click', showConnectionModal);
   document.getElementById('tradeBtn').addEventListener('click', showTradeModal);
+  document.getElementById('showLogBtn').addEventListener('click', showLogModal);
   document.getElementById('executeGraphBtn').addEventListener('click', executeNodeStrategy);
   document.getElementById('saveGraphBtn').addEventListener('click', saveGraph);
   document.getElementById('loadGraphBtn').addEventListener('click', loadGraph);
@@ -45,6 +94,11 @@ function setupEventListeners() {
   // Volume loss reminder modal
   document.getElementById('closeAlertBtn').addEventListener('click', hidePriceDropAlert);
   document.getElementById('modifyPositionBtn').addEventListener('click', handleModifyPositionFromAlert);
+  
+  // Log modal
+  document.getElementById('closeLogBtn').addEventListener('click', hideLogModal);
+  document.getElementById('clearLogBtn').addEventListener('click', clearLog);
+  document.getElementById('copyLogBtn').addEventListener('click', copyLog);
   
   // Node palette buttons
   document.querySelectorAll('.node-btn').forEach(btn => {
@@ -185,8 +239,9 @@ async function handleExecuteTrade() {
 }
 
 async function handleConnect() {
-  const server = document.getElementById('server').value;
-  const port = document.getElementById('port').value;
+  // Use default connection settings - no need for user input
+  const server = 'localhost';
+  const port = '8765';
 
   showMessage('Connecting to MT5...', 'info');
   hideConnectionModal();
@@ -398,7 +453,11 @@ function updatePropertiesPanel(node) {
         <input type="text" value="${node.title}" disabled>
       </div>
       <p class="no-selection">This node has no parameters</p>
-
+      <div class="property-actions">
+        <button class="btn btn-danger btn-small" onclick="deleteSelectedNode()">
+          Delete Node
+        </button>
+      </div>
     `;
     return;
   }
@@ -473,13 +532,29 @@ function updatePropertiesPanel(node) {
 
   `;
   
-  // Add test volume loss button for trade nodes
+  // Add action buttons
+  let actionButtons = '';
+  
+  // Add test loss button for trade nodes
   if (node.type === 'trade-signal') {
+    actionButtons += `
+      <button class="btn btn-secondary btn-small" onclick="testVolumeLossFromNode('${node.id}')">
+        Test Loss
+      </button>
+    `;
+  }
+  
+  // Add delete button for all nodes
+  actionButtons += `
+    <button class="btn btn-danger btn-small" onclick="deleteSelectedNode()">
+      Delete Node
+    </button>
+  `;
+  
+  if (actionButtons) {
     panel.innerHTML += `
       <div class="property-actions">
-        <button class="btn btn-secondary btn-small" onclick="testVolumeLossFromNode('${node.id}')">
-          Test Volume Loss
-        </button>
+        ${actionButtons}
       </div>
     `;
   }
@@ -552,13 +627,7 @@ window.deleteSelectedNode = function() {
   }
 };
 
-// Add keyboard shortcut for deleting nodes (Delete key)
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Delete' && nodeEditor && nodeEditor.selectedNode) {
-    e.preventDefault();
-    window.deleteSelectedNode();
-  }
-});
+// Delete key functionality disabled - nodes cannot be deleted with Delete key
 
 // Graph Management
 function saveGraph() {
@@ -646,46 +715,54 @@ async function calculateVolumeLoss() {
   }
   
   try {
-    // Get current market data for the symbol
-    let result;
+    let currentPrice;
+    let contractSize = 1;
+    let tickValue = 1;
+    let tickSize = 1;
     
     // Check if MT5 is connected, otherwise use mock data for testing
     if (isConnected && window.mt5API) {
-      result = await window.mt5API.getMarketData(symbol);
+      try {
+        // Get symbol info for accurate calculation
+        const symbolInfoResult = await window.mt5API.getSymbolInfo(symbol);
+        if (symbolInfoResult.success && symbolInfoResult.data) {
+          const symbolInfo = symbolInfoResult.data;
+          currentPrice = symbolInfo.bid || symbolInfo.ask;
+          contractSize = symbolInfo.trade_contract_size || 1;
+          tickValue = symbolInfo.trade_tick_value || 1;
+          tickSize = symbolInfo.trade_tick_size || 1;
+        } else {
+          // Fallback to market data only
+          const marketResult = await window.mt5API.getMarketData(symbol);
+          if (marketResult.success && marketResult.data) {
+            currentPrice = marketResult.data.bid || marketResult.data.ask || marketResult.data.price;
+          }
+        }
+      } catch (err) {
+        console.error('Error getting symbol info:', err);
+      }
     } else {
       // Mock data for testing without MT5 connection
-      result = {
-        success: true,
-        data: {
-          bid: 1.0850, // Mock EURUSD price
-          ask: 1.0852,
-          price: 1.0851
-        }
-      };
+      currentPrice = 1.0850; // Mock EURUSD price
     }
     
-    if (result.success && result.data) {
-      const currentPrice = result.data.bid || result.data.ask || result.data.price;
-      
-      if (!currentPrice || currentPrice <= 0) {
-        document.getElementById('volumeLossInfo').style.display = 'none';
-        return;
-      }
-      
-      // Calculate loss for 1% price drop
-      // Formula: volume * (price * 0.01)
-      const onePercentDrop = currentPrice * 0.01;
-      const totalLoss = volume * onePercentDrop;
-      
-      document.getElementById('potentialLoss').textContent = `$${totalLoss.toFixed(2)}`;
-      document.getElementById('volumeLossInfo').style.display = 'block';
-      
-      // Show immediate popup reminder
-      showVolumeLossReminder(symbol, volume, currentPrice, totalLoss);
-      
-    } else {
+    if (!currentPrice || currentPrice <= 0) {
       document.getElementById('volumeLossInfo').style.display = 'none';
+      return;
     }
+    
+    // Calculate accurate loss using standard MT5 formula
+    // Loss = (Price Change) × Contract Size × Volume
+    // For a 1% drop: price change = currentPrice * 0.01
+    const priceChange = currentPrice * 0.01; // 1% of current price
+    const totalLoss = priceChange * contractSize * volume;
+    
+    document.getElementById('potentialLoss').textContent = `$${totalLoss.toFixed(2)}`;
+    document.getElementById('volumeLossInfo').style.display = 'block';
+    
+    // Show immediate popup reminder
+    showVolumeLossReminder(symbol, volume, currentPrice, totalLoss);
+    
   } catch (error) {
     console.error('Error calculating volume loss:', error);
     document.getElementById('volumeLossInfo').style.display = 'none';
@@ -696,12 +773,15 @@ async function calculateVolumeLoss() {
 function showVolumeLossReminder(symbol, volume, currentPrice, potentialLoss) {
   const alertModal = document.getElementById('priceDropAlert');
   
+  // Calculate price after 1% drop
+  const priceAfter1PercentDrop = currentPrice * 0.99;
+  
   // Update alert content for volume loss reminder
   document.getElementById('alertSymbol').textContent = symbol;
   document.getElementById('alertVolume').textContent = volume;
   document.getElementById('alertEntryPrice').textContent = currentPrice.toFixed(5);
-  document.getElementById('alertCurrentPrice').textContent = currentPrice.toFixed(5);
-  document.getElementById('alertPriceChange').textContent = '0.00%';
+  document.getElementById('alertCurrentPrice').textContent = priceAfter1PercentDrop.toFixed(5);
+  document.getElementById('alertPriceChange').textContent = '-1.00%';
   document.getElementById('alertCurrentLoss').textContent = `$${potentialLoss.toFixed(2)}`;
   
   // Show alert
@@ -750,18 +830,54 @@ function testVolumeLossFromNode(nodeId) {
     return;
   }
   
-  // Get current market data or use mock data
+  // Get current market data and symbol info for accurate calculation
   async function calculateAndShowLoss() {
     try {
       let currentPrice;
+      let contractSize = 1;
+      let tickValue = 1;
+      let tickSize = 1;
       
-      // Check if MT5 is connected, otherwise use mock data for testing
+      // Check if MT5 is connected
       if (isConnected && window.mt5API) {
-        const result = await window.mt5API.getMarketData(symbol);
-        if (result.success && result.data) {
-          currentPrice = result.data.bid || result.data.ask || result.data.price;
-        } else {
-          currentPrice = 1.0850; // Fallback to mock data
+        // Get symbol info for accurate calculation
+        console.log('Attempting to get symbol info for:', symbol);
+        console.log('MT5 connected:', isConnected);
+        console.log('MT5 API available:', !!window.mt5API);
+        
+        try {
+          const symbolInfoResult = await window.mt5API.getSymbolInfo(symbol);
+          console.log('Symbol info result:', symbolInfoResult);
+          
+          if (symbolInfoResult.success && symbolInfoResult.data) {
+            const symbolInfo = symbolInfoResult.data;
+            currentPrice = symbolInfo.bid || symbolInfo.ask;
+            contractSize = symbolInfo.trade_contract_size || 1;
+            tickValue = symbolInfo.trade_tick_value || 1;
+            tickSize = symbolInfo.trade_tick_size || 1;
+            
+            console.log('Symbol info retrieved:', symbolInfo);
+            console.log('Contract size:', contractSize);
+            console.log('Tick value:', tickValue);
+            console.log('Tick size:', tickSize);
+          } else {
+            console.log('Symbol info failed, trying market data...');
+            // Fallback to market data only
+            const marketResult = await window.mt5API.getMarketData(symbol);
+            console.log('Market data result:', marketResult);
+            
+            if (marketResult.success && marketResult.data) {
+              currentPrice = marketResult.data.bid || marketResult.data.ask;
+              console.log('Using market data price:', currentPrice);
+            } else {
+              currentPrice = 1.0850; // Mock data
+              console.log('Using mock data price:', currentPrice);
+            }
+          }
+        } catch (err) {
+          console.error('Error getting symbol info:', err);
+          currentPrice = 1.0850; // Mock data
+          console.log('Using mock data due to error:', currentPrice);
         }
       } else {
         currentPrice = 1.0850; // Mock EURUSD price
@@ -772,12 +888,20 @@ function testVolumeLossFromNode(nodeId) {
         return;
       }
       
-      // Calculate test loss
-      // Formula: volume * (price * 0.01) * contract_size
-      // For forex pairs, 1 lot = 100,000 units of base currency
-      // Loss = volume * price_drop * pip_value
-      const onePercentDrop = currentPrice * 0.01;
-      const totalLoss = volume * onePercentDrop;
+      // Calculate accurate loss using standard MT5 formula
+      // Loss = (Price Change) × Contract Size × Volume
+      // For a 1% drop: price change = currentPrice * 0.01
+      const priceChange = currentPrice * 0.01; // 1% of current price
+      const totalLoss = priceChange * contractSize * volume;
+      
+      console.log('Calculation details:');
+      console.log('Current price:', currentPrice);
+      console.log('1% price change:', priceChange);
+      console.log('Contract size:', contractSize);
+      console.log('Volume:', volume);
+      console.log('Tick value:', tickValue);
+      console.log('Tick size:', tickSize);
+      console.log('Final loss for 1% move:', totalLoss);
       
       // Show the popup reminder with trade node data
       showVolumeLossReminder(symbol, volume, currentPrice, totalLoss);
@@ -791,4 +915,60 @@ function testVolumeLossFromNode(nodeId) {
   
   // Execute the calculation
   calculateAndShowLoss();
+}
+
+// Log Modal Functions
+function showLogModal() {
+  document.getElementById('logModal').classList.add('show');
+  
+  // Add a test log entry to verify logging is working
+  addLogEntry('info', 'Log modal opened - logging system is working');
+  
+  updateLogDisplay();
+}
+
+function hideLogModal() {
+  document.getElementById('logModal').classList.remove('show');
+}
+
+function updateLogDisplay() {
+  const logContent = document.getElementById('logContent');
+  
+  if (!logContent) {
+    console.error('Log content element not found');
+    return;
+  }
+  
+  if (logEntries.length === 0) {
+    logContent.innerHTML = '<p class="no-log">No log entries yet. Try testing volume loss to see symbol info.</p>';
+    return;
+  }
+  
+  logContent.innerHTML = logEntries.map(entry => `
+    <div class="log-entry">
+      <span class="log-timestamp">[${entry.timestamp}]</span>
+      <span class="log-${entry.type}">${entry.message}</span>
+    </div>
+  `).join('');
+  
+  // Scroll to bottom
+  logContent.scrollTop = logContent.scrollHeight;
+}
+
+function clearLog() {
+  logEntries = [];
+  updateLogDisplay();
+  showMessage('Log cleared', 'info');
+}
+
+function copyLog() {
+  const logText = logEntries.map(entry => 
+    `[${entry.timestamp}] ${entry.type.toUpperCase()}: ${entry.message}`
+  ).join('\n');
+  
+  navigator.clipboard.writeText(logText).then(() => {
+    showMessage('Log copied to clipboard', 'success');
+  }).catch(() => {
+    showMessage('Failed to copy log', 'error');
+  });
 }

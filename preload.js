@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('mt5API', {
   modifyPosition: (ticket, stopLoss, takeProfit) => ipcRenderer.invoke('mt5:modifyPosition', { ticket, stopLoss, takeProfit }),
   executeNodeStrategy: (nodeGraph) => ipcRenderer.invoke('mt5:executeNodeStrategy', nodeGraph),
   getMarketData: (symbol) => ipcRenderer.invoke('mt5:getMarketData', symbol),
+  getSymbolInfo: (symbol) => ipcRenderer.invoke('mt5:getSymbolInfo', symbol),
   getSymbols: (group) => ipcRenderer.invoke('mt5:getSymbols', group),
   searchSymbols: (query) => ipcRenderer.invoke('mt5:searchSymbols', query),
   executeOrder: (orderData) => ipcRenderer.invoke('mt5:executeOrder', orderData)

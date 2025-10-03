@@ -256,6 +256,15 @@ class MT5Bridge {
     return response.data;
   }
 
+  async getSymbolInfo(symbol) {
+    if (!this.connected) {
+      throw new Error('Not connected to MT5');
+    }
+
+    const response = await this.sendMessage('getSymbolInfo', { symbol });
+    return response.data;
+  }
+
   async executeOrder(orderData) {
     if (!this.connected) {
       throw new Error('Not connected to MT5');

@@ -220,6 +220,34 @@ class MT5Bridge:
             "time": datetime.fromtimestamp(tick.time).isoformat()
         }
     
+    def get_symbol_info(self, symbol):
+        """Get detailed symbol specifications including contract size and tick value"""
+        if not self.connected_to_mt5:
+            return {"error": "Not connected to MT5"}
+        
+        symbol_info = mt5.symbol_info(symbol)
+        if symbol_info is None:
+            return {"error": f"Failed to get symbol info for {symbol}"}
+        
+        return {
+            "name": symbol_info.name,
+            "description": symbol_info.description if hasattr(symbol_info, 'description') else symbol_info.name,
+            "currency_base": symbol_info.currency_base,
+            "currency_profit": symbol_info.currency_profit,
+            "currency_margin": symbol_info.currency_margin,
+            "digits": symbol_info.digits,
+            "point": symbol_info.point,
+            "trade_contract_size": symbol_info.trade_contract_size,
+            "trade_tick_value": symbol_info.trade_tick_value,
+            "trade_tick_size": symbol_info.trade_tick_size,
+            "volume_min": symbol_info.volume_min,
+            "volume_max": symbol_info.volume_max,
+            "volume_step": symbol_info.volume_step,
+            "bid": symbol_info.bid,
+            "ask": symbol_info.ask,
+            "spread": symbol_info.spread
+        }
+    
     def get_symbols(self, group="*"):
         """Get available symbols from MT5"""
         if not self.connected_to_mt5:
@@ -341,6 +369,11 @@ class MT5Bridge:
             elif action == 'searchSymbols':
                 query = data.get('query', '')
                 result = self.search_symbols(query)
+                response['data'] = result
+            
+            elif action == 'getSymbolInfo':
+                symbol = data.get('symbol')
+                result = self.get_symbol_info(symbol)
                 response['data'] = result
             
             else:

@@ -134,6 +134,15 @@ ipcMain.handle('mt5:searchSymbols', async (event, query) => {
     }
 });
 
+ipcMain.handle('mt5:getSymbolInfo', async (event, symbol) => {
+    try {
+        const symbolInfo = await mt5Bridge.getSymbolInfo(symbol);
+        return { success: true, data: symbolInfo };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.handle('mt5:executeOrder', async (event, orderData) => {
     try {
         const result = await mt5Bridge.executeOrder(orderData);

@@ -17,6 +17,7 @@
       <div class="toolbar-right">
         <button id="connectBtn" class="btn btn-primary">Connect MT5</button>
         <button id="tradeBtn" class="btn btn-success">New Trade</button>
+        <button id="showLogBtn" class="btn btn-secondary">Show Log</button>
         <button id="executeGraphBtn" class="btn btn-success">Execute Strategy</button>
         <button id="saveGraphBtn" class="btn btn-secondary">Save</button>
         <button id="loadGraphBtn" class="btn btn-secondary">Load</button>
@@ -113,13 +114,9 @@
     <div id="connectionModal" class="modal">
       <div class="modal-content">
         <h2>Connect to MT5</h2>
-        <div class="form-group">
-          <label>Server:</label>
-          <input type="text" id="server" value="localhost">
-        </div>
-        <div class="form-group">
-          <label>Port:</label>
-          <input type="text" id="port" value="5555">
+        <div class="connection-info">
+          <p>Connecting to MetaTrader 5...</p>
+          <p class="connection-details">Server: localhost:8765 (Python Bridge)</p>
         </div>
         <div class="modal-buttons">
           <button id="confirmConnectBtn" class="btn btn-primary">Connect</button>
@@ -177,6 +174,23 @@
 
     <div id="messageBox" class="message-box"></div>
 
+    <!-- Log Modal -->
+    <div id="logModal" class="modal">
+      <div class="modal-content log-modal">
+        <h2>Console Log</h2>
+        <div class="log-controls">
+          <button id="clearLogBtn" class="btn btn-secondary btn-small">Clear Log</button>
+          <button id="copyLogBtn" class="btn btn-secondary btn-small">Copy Log</button>
+        </div>
+        <div id="logContent" class="log-content">
+          <p class="no-log">No log entries yet. Try testing volume loss to see symbol info.</p>
+        </div>
+        <div class="modal-buttons">
+          <button id="closeLogBtn" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Volume Loss Reminder Modal -->
     <div id="priceDropAlert" class="price-drop-alert" style="display: none;">
       <h3>
@@ -184,7 +198,7 @@
         Volume Loss Reminder
       </h3>
       <div class="alert-content">
-        <p>Potential loss if price drops 1% from current price:</p>
+        <p>If you execute this volume and price moves 1% against you:</p>
         <div class="alert-details">
           <div class="alert-detail-item">
             <span>Symbol:</span>
@@ -195,11 +209,11 @@
             <span id="alertVolume">-</span>
           </div>
           <div class="alert-detail-item">
-            <span>Entry Price:</span>
+            <span>Current Price:</span>
             <span id="alertEntryPrice">-</span>
           </div>
           <div class="alert-detail-item">
-            <span>Current Price:</span>
+            <span>Price After 1% Drop:</span>
             <span id="alertCurrentPrice">-</span>
           </div>
           <div class="alert-detail-item">
@@ -207,7 +221,7 @@
             <span id="alertPriceChange">-</span>
           </div>
           <div class="alert-detail-item">
-            <span>Current Loss:</span>
+            <span>Potential Loss:</span>
             <span id="alertCurrentLoss">-</span>
           </div>
         </div>
