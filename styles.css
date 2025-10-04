@@ -62,10 +62,15 @@ h4 {
 }
 
 .status {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 4px;
   font-weight: bold;
   font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  line-height: 1;
 }
 
 .status.connected {
@@ -76,6 +81,20 @@ h4 {
 .status.disconnected {
   background: #f44336;
   color: white;
+}
+
+.status.overtrade-status {
+  background: #2196F3;
+  font-size: 12px;
+  min-width: 80px;
+}
+
+.status.overtrade-status.warning {
+  background: #FF9800;
+}
+
+.status.overtrade-status.danger {
+  background: #f44336;
 }
 
 /* Main Layout */
@@ -1005,4 +1024,701 @@ h4 {
   font-style: italic;
   text-align: center;
   padding: 20px;
+}
+/* History 
+Import Styles */
+.status.backtest {
+  background: #FF9800;
+  color: white;
+  margin-left: 10px;
+}
+
+.import-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #444;
+}
+
+.tab-btn {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  color: #b0b0b0;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s;
+}
+
+.tab-btn:hover {
+  color: #e0e0e0;
+}
+
+.tab-btn.active {
+  color: #64B5F6;
+  border-bottom-color: #64B5F6;
+}
+
+.import-tab {
+  display: none;
+}
+
+.import-tab.active {
+  display: block;
+}
+
+.history-status {
+  margin: 15px 0;
+  padding: 10px;
+  border-radius: 4px;
+  min-height: 40px;
+}
+
+.history-status .loading {
+  color: #64B5F6;
+  text-align: center;
+}
+
+.history-status .success-message {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid #4CAF50;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.history-status .success-message p {
+  margin: 5px 0;
+  color: #4CAF50;
+}
+
+.history-status .error-message {
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid #f44336;
+  padding: 10px;
+  border-radius: 4px;
+  color: #f44336;
+}
+
+.help-text {
+  font-size: 12px;
+  color: #888;
+  margin-top: 5px;
+}
+
+.btn-info {
+  background: #2196F3;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #1976D2;
+}
+
+.btn-warning {
+  background: #FF9800;
+  color: white;
+}
+
+.btn-warning:hover {
+  background: #F57C00;
+}
+/* Overtrade Control Styles */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4CAF50;
+}
+
+.overtrade-status {
+  margin-top: 20px;
+  padding: 15px;
+  background: #333;
+  border-radius: 8px;
+  border: 1px solid #555;
+}
+
+.overtrade-status h3 {
+  margin-bottom: 15px;
+  color: #64B5F6;
+  font-size: 16px;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  border: 1px solid #444;
+}
+
+.status-item .label {
+  font-size: 13px;
+  color: #bbb;
+}
+
+.status-item span:last-child {
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.btn-warning {
+  background: #FF9800;
+  color: white;
+  border: none;
+}
+
+.btn-warning:hover {
+  background: #F57C00;
+}
+
+.overtrade-warning {
+  background: #FF5722;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.overtrade-warning .warning-icon {
+  font-size: 18px;
+}
+
+.cooldown-indicator {
+  background: #2196F3;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 10px 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.overtrade-warning-content {
+  padding: 15px 0;
+}
+
+.overtrade-warning-content p {
+  margin-bottom: 15px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.warning-details {
+  background: #333;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 15px 0;
+  border: 1px solid #555;
+}
+
+.warning-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #444;
+}
+
+.warning-item:last-child {
+  border-bottom: none;
+}
+
+.warning-item span:first-child {
+  color: #bbb;
+  font-size: 14px;
+}
+
+.warning-item span:last-child {
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+.warning-message {
+  background: #FF9800;
+  color: white;
+  padding: 12px 15px;
+  border-radius: 6px;
+  margin: 15px 0;
+}
+
+.warning-message p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+/* Overtrade Popup Notification - EXAGGERATED VERSION */
+.overtrade-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3500;
+  background: linear-gradient(45deg, #FF1744, #D50000, #FF5722, #FF1744);
+  background-size: 400% 400%;
+  border: 4px solid #FFEB3B;
+  border-radius: 20px;
+  box-shadow: 
+    0 0 50px rgba(255, 23, 68, 0.8),
+    0 0 100px rgba(255, 23, 68, 0.6),
+    0 0 150px rgba(255, 23, 68, 0.4),
+    inset 0 0 30px rgba(255, 255, 255, 0.2);
+  animation: 
+    overtradeExplode 0.8s ease-out,
+    overtradeShake 0.5s infinite,
+    overtradeGlow 1s infinite,
+    overtradeGradient 3s ease infinite;
+  min-width: 450px;
+  max-width: 600px;
+  filter: drop-shadow(0 0 30px #FF1744);
+}
+
+.overtrade-popup::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  background: linear-gradient(45deg, #FFEB3B, #FF9800, #FFEB3B);
+  border-radius: 25px;
+  z-index: -1;
+  animation: overtradeHalo 2s infinite;
+}
+
+.overtrade-popup-content {
+  display: flex;
+  align-items: center;
+  padding: 25px 30px;
+  gap: 20px;
+  position: relative;
+}
+
+.overtrade-popup-icon {
+  font-size: 60px;
+  animation: 
+    overtradeIconMegaBounce 0.6s infinite,
+    overtradeIconSpin 4s linear infinite,
+    overtradeIconScale 1s infinite;
+  flex-shrink: 0;
+  text-shadow: 
+    0 0 10px #FFEB3B,
+    0 0 20px #FFEB3B,
+    0 0 30px #FFEB3B;
+}
+
+.overtrade-popup-text {
+  flex: 1;
+  color: white;
+  animation: overtradeTextFlash 1.5s infinite;
+}
+
+.overtrade-popup-title {
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 8px;
+  text-shadow: 
+    0 0 10px #FFEB3B,
+    2px 2px 4px rgba(0,0,0,0.8),
+    0 0 20px #FFEB3B;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  animation: overtradeTextPulse 0.8s infinite;
+}
+
+.overtrade-popup-message {
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1.4;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+  animation: overtradeMessageBlink 2s infinite;
+}
+
+.overtrade-popup-close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: linear-gradient(45deg, #FF1744, #D50000);
+  border: 2px solid #FFEB3B;
+  color: white;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  animation: overtradeCloseRotate 3s linear infinite;
+}
+
+.overtrade-popup-close:hover {
+  background: linear-gradient(45deg, #FFEB3B, #FF9800);
+  color: #D50000;
+  transform: scale(1.2) rotate(180deg);
+  box-shadow: 0 0 20px #FFEB3B;
+}
+
+/* EXAGGERATED ANIMATIONS */
+@keyframes overtradeExplode {
+  0% {
+    transform: translate(-50%, -50%) scale(0.1) rotate(-180deg);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes overtradeShake {
+  0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+  10% { transform: translate(-50%, -50%) translateX(-10px); }
+  20% { transform: translate(-50%, -50%) translateX(10px); }
+  30% { transform: translate(-50%, -50%) translateX(-8px); }
+  40% { transform: translate(-50%, -50%) translateX(8px); }
+  50% { transform: translate(-50%, -50%) translateX(-6px); }
+  60% { transform: translate(-50%, -50%) translateX(6px); }
+  70% { transform: translate(-50%, -50%) translateX(-4px); }
+  80% { transform: translate(-50%, -50%) translateX(4px); }
+  90% { transform: translate(-50%, -50%) translateX(-2px); }
+}
+
+@keyframes overtradeGlow {
+  0%, 100% {
+    box-shadow: 
+      0 0 50px rgba(255, 23, 68, 0.8),
+      0 0 100px rgba(255, 23, 68, 0.6),
+      0 0 150px rgba(255, 23, 68, 0.4),
+      inset 0 0 30px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 0 80px rgba(255, 23, 68, 1),
+      0 0 150px rgba(255, 23, 68, 0.8),
+      0 0 200px rgba(255, 23, 68, 0.6),
+      inset 0 0 50px rgba(255, 255, 255, 0.4);
+  }
+}
+
+@keyframes overtradeGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes overtradeHalo {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes overtradeIconMegaBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-20px) scale(1.2); }
+  50% { transform: translateY(0) scale(0.9); }
+  75% { transform: translateY(-10px) scale(1.1); }
+}
+
+@keyframes overtradeIconSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes overtradeIconScale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+@keyframes overtradeTextFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes overtradeTextPulse {
+  0%, 100% { 
+    transform: scale(1);
+    text-shadow: 
+      0 0 10px #FFEB3B,
+      2px 2px 4px rgba(0,0,0,0.8),
+      0 0 20px #FFEB3B;
+  }
+  50% { 
+    transform: scale(1.1);
+    text-shadow: 
+      0 0 20px #FFEB3B,
+      2px 2px 4px rgba(0,0,0,0.8),
+      0 0 40px #FFEB3B,
+      0 0 60px #FFEB3B;
+  }
+}
+
+@keyframes overtradeMessageBlink {
+  0%, 90%, 100% { opacity: 1; }
+  95% { opacity: 0.3; }
+}
+
+@keyframes overtradeCloseRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes overtradePageFlash {
+  0%, 100% { 
+    background-color: transparent;
+    box-shadow: none;
+  }
+  50% { 
+    background-color: rgba(255, 23, 68, 0.1);
+    box-shadow: inset 0 0 100px rgba(255, 23, 68, 0.3);
+  }
+}
+
+/* Persistent Overtrade Reminder Panel */
+.overtrade-reminder-panel {
+  background: #252525;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 2px solid #444;
+  transition: all 0.3s ease;
+}
+
+.overtrade-reminder-panel.warning {
+  border-color: #FF9800;
+  background: linear-gradient(135deg, #252525 0%, #2d2520 100%);
+}
+
+.overtrade-reminder-panel.danger {
+  border-color: #f44336;
+  background: linear-gradient(135deg, #252525 0%, #2d2020 100%);
+  animation: panelPulse 2s infinite;
+}
+
+.overtrade-status-display {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.overtrade-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #1e1e1e;
+  border-radius: 6px;
+  border-left: 4px solid #4CAF50;
+  transition: all 0.3s ease;
+}
+
+.overtrade-indicator.warning {
+  border-left-color: #FF9800;
+  background: linear-gradient(135deg, #1e1e1e 0%, #1e1c18 100%);
+}
+
+.overtrade-indicator.danger {
+  border-left-color: #f44336;
+  background: linear-gradient(135deg, #1e1e1e 0%, #1e1818 100%);
+  animation: indicatorFlash 1s infinite;
+}
+
+.indicator-icon {
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.indicator-icon.warning {
+  animation: iconBounce 2s infinite;
+}
+
+.indicator-icon.danger {
+  animation: iconSpin 1s infinite, iconBounce 0.5s infinite;
+}
+
+.indicator-text {
+  font-weight: bold;
+  font-size: 14px;
+  color: #4CAF50;
+  transition: all 0.3s ease;
+}
+
+.indicator-text.warning {
+  color: #FF9800;
+}
+
+.indicator-text.danger {
+  color: #f44336;
+  animation: textFlash 1s infinite;
+}
+
+.trade-count-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.count-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.count-label {
+  color: #b0b0b0;
+}
+
+.count-value {
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+.count-value.warning {
+  color: #FF9800;
+}
+
+.count-value.danger {
+  color: #f44336;
+  animation: valueFlash 1s infinite;
+}
+
+.overtrade-message {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+  padding: 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: messageSlideIn 0.5s ease-out, messagePulse 2s infinite;
+  border: 1px solid #ff6b6b;
+}
+
+.message-icon {
+  font-size: 18px;
+  animation: messageIconBounce 1s infinite;
+}
+
+.message-text {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.message-text strong {
+  font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Animations for the persistent panel */
+@keyframes panelPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(244, 67, 54, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.6);
+  }
+}
+
+@keyframes indicatorFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes iconBounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+  60% { transform: translateY(-2px); }
+}
+
+@keyframes iconSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes textFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes valueFlash {
+  0%, 100% { 
+    color: #f44336;
+    text-shadow: none;
+  }
+  50% { 
+    color: #ff6b6b;
+    text-shadow: 0 0 8px #f44336;
+  }
+}
+
+@keyframes messageSlideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes messagePulse {
+  0%, 100% {
+    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  }
+  50% {
+    background: linear-gradient(135deg, #ff5722 0%, #f44336 100%);
+  }
+}
+
+@keyframes messageIconBounce {
+  0%, 20%, 50%, 80%, 100% { transform: scale(1); }
+  40% { transform: scale(1.2); }
+  60% { transform: scale(1.1); }
 }

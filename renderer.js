@@ -79,6 +79,7 @@ function logMT5Response(action, response, requestData = null) {
 document.addEventListener('DOMContentLoaded', () => {
   initializeNodeEditor();
   setupEventListeners();
+  window.historyImport.checkBacktestMode();
 });
 
 function initializeNodeEditor() {
@@ -92,6 +93,7 @@ function setupEventListeners() {
   // Toolbar buttons
   document.getElementById('connectBtn').addEventListener('click', showConnectionModal);
   document.getElementById('tradeBtn').addEventListener('click', showTradeModal);
+  document.getElementById('backtestBtn').addEventListener('click', () => window.historyImport.showBacktestModal());
   document.getElementById('showLogBtn').addEventListener('click', showLogModal);
   document.getElementById('executeGraphBtn').addEventListener('click', executeNodeStrategy);
   document.getElementById('saveGraphBtn').addEventListener('click', saveGraph);
@@ -103,6 +105,8 @@ function setupEventListeners() {
   document.getElementById('cancelConnectBtn').addEventListener('click', hideConnectionModal);
   document.getElementById('confirmTradeBtn').addEventListener('click', handleExecuteTrade);
   document.getElementById('cancelTradeBtn').addEventListener('click', hideTradeModal);
+  document.getElementById('confirmImportBtn').addEventListener('click', () => window.historyImport.handleImportHistory());
+  document.getElementById('cancelImportBtn').addEventListener('click', () => window.historyImport.hideBacktestModal());
   
   // Account refresh
   document.getElementById('refreshAccountBtn').addEventListener('click', handleRefreshAccount);
@@ -228,6 +232,15 @@ async function handleExecuteTrade() {
   
   if (!volume || volume <= 0) {
     showMessage('Please enter a valid volume', 'error');
+    return;
+  }
+
+  // Check overtrade control before proceeding
+  const tradeData = { symbol, type, volume, stopLoss, takeProfit };
+  const shouldProceed = await window.overtradeControl.checkBeforeTrade('manual', tradeData);
+  
+  if (!shouldProceed) {
+    showMessage('Trade cancelled', 'info');
     return;
   }
   
@@ -444,6 +457,14 @@ async function executeNodeStrategy() {
     return;
   }
 
+  // Check overtrade control for node-based strategies
+  const shouldProceed = await window.overtradeControl.checkBeforeTrade('node', { nodeCount: graph.nodes.length });
+  
+  if (!shouldProceed) {
+    showMessage('Node strategy execution cancelled', 'info');
+    return;
+  }
+
   showMessage('Executing node-based strategy...', 'info');
 
   const result = await window.mt5API.executeNodeStrategy(graph);
@@ -529,7 +550,7 @@ function updatePropertiesPanel(node) {
                    onchange="updateNodeParam('${key}', parseInt(this.value))">
           </div>
         `;
-      } else if (key === 'action' && node.type === 'trade-signal') {
+      } else if (key === 'action' && (node.type === 'trade-signal' || node.type === 'trade-trailing')) {
         return `
           <div class="property-item">
             <label>${key}:</label>
@@ -537,6 +558,30 @@ function updatePropertiesPanel(node) {
               <option value="BUY" ${value === 'BUY' ? 'selected' : ''}>BUY</option>
               <option value="SELL" ${value === 'SELL' ? 'selected' : ''}>SELL</option>
             </select>
+          </div>
+        `;
+      } else if ((key === 'trailDistance' || key === 'trailStep') && node.type === 'trade-trailing') {
+        return `
+          <div class="property-item">
+            <label>${key} (pips):</label>
+            <input type="number" 
+                   value="${value}" 
+                   min="1"
+                   step="1"
+                   data-param="${key}"
+                   onchange="updateNodeParam('${key}', parseInt(this.value))">
+          </div>
+        `;
+      } else if (key === 'volume' && (node.type === 'trade-signal' || node.type === 'trade-trailing')) {
+        return `
+          <div class="property-item">
+            <label>${key}:</label>
+            <input type="number" 
+                   value="${value}" 
+                   min="0.01"
+                   step="0.01"
+                   data-param="${key}"
+                   onchange="updateNodeParam('${key}', parseFloat(this.value))">
           </div>
         `;
       } else if (key === 'operator' && node.type === 'conditional-check') {
@@ -592,7 +637,7 @@ function updatePropertiesPanel(node) {
   }
   
   // Add test loss button for trade nodes
-  if (node.type === 'trade-signal') {
+  if (node.type === 'trade-signal' || node.type === 'trade-trailing') {
     actionButtons += `
       <button class="btn btn-secondary btn-small" onclick="testVolumeLossFromNode('${node.id}')">
         Test Loss

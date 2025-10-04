@@ -343,6 +343,63 @@ class MT5Bridge:
         
         return result[:20]  # Limit to 20 results
     
+    def get_historical_data(self, symbol, timeframe, start_date=None, end_date=None, bars=None):
+        """Get historical data from MT5"""
+        if not self.connected_to_mt5:
+            return {"error": "Not connected to MT5"}
+        
+        # Map timeframe strings to MT5 constants
+        timeframe_map = {
+            'M1': mt5.TIMEFRAME_M1,
+            'M5': mt5.TIMEFRAME_M5,
+            'M15': mt5.TIMEFRAME_M15,
+            'M30': mt5.TIMEFRAME_M30,
+            'H1': mt5.TIMEFRAME_H1,
+            'H4': mt5.TIMEFRAME_H4,
+            'D1': mt5.TIMEFRAME_D1,
+            'W1': mt5.TIMEFRAME_W1,
+        }
+        
+        tf = timeframe_map.get(timeframe, mt5.TIMEFRAME_H1)
+        
+        try:
+            # Get rates based on parameters
+            if bars:
+                # Get last N bars
+                rates = mt5.copy_rates_from_pos(symbol, tf, 0, bars)
+            elif start_date and end_date:
+                # Get rates between dates
+                rates = mt5.copy_rates_range(symbol, tf, start_date, end_date)
+            else:
+                # Default: get last 1000 bars
+                rates = mt5.copy_rates_from_pos(symbol, tf, 0, 1000)
+            
+            if rates is None or len(rates) == 0:
+                return {"error": f"No data available for {symbol}"}
+            
+            # Convert to list of dictionaries
+            result = []
+            for rate in rates:
+                result.append({
+                    "time": datetime.fromtimestamp(rate['time']).isoformat(),
+                    "open": float(rate['open']),
+                    "high": float(rate['high']),
+                    "low": float(rate['low']),
+                    "close": float(rate['close']),
+                    "volume": int(rate['tick_volume'])
+                })
+            
+            return {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "bars": len(result),
+                "data": result
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting historical data: {e}")
+            return {"error": str(e)}
+    
     async def handle_message(self, websocket, message):
         """Handle incoming WebSocket messages from Electron"""
         try:
@@ -404,6 +461,22 @@ class MT5Bridge:
             elif action == 'getSymbolInfo':
                 symbol = data.get('symbol')
                 result = self.get_symbol_info(symbol)
+                response['data'] = result
+            
+            elif action == 'getHistoricalData':
+                symbol = data.get('symbol')
+                timeframe = data.get('timeframe', 'H1')
+                start_date = data.get('startDate')
+                end_date = data.get('endDate')
+                bars = data.get('bars')
+                
+                # Convert date strings to datetime objects if provided
+                if start_date:
+                    start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                if end_date:
+                    end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                
+                result = self.get_historical_data(symbol, timeframe, start_date, end_date, bars)
                 response['data'] = result
             
             else:

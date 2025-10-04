@@ -127,8 +127,12 @@ class NodeEditor {
   }
 
   onKeyDown(e) {
-    // Delete key functionality disabled - nodes cannot be deleted with Delete key
-    // This method is kept for potential future keyboard shortcuts
+    // Delete key to remove selected node
+    if (e.key === 'Delete') {
+      if (this.selectedNode) {
+        this.deleteSelectedNode();
+      }
+    }
   }
 
   deleteSelectedNode() {
@@ -234,6 +238,18 @@ class NodeEditor {
           action: 'BUY', 
           symbol: 'EURUSD',
           volume: 0.1
+        }
+      },
+      'trade-trailing': {
+        title: 'Trailing Trade',
+        inputs: ['trigger'],
+        outputs: [],
+        params: { 
+          action: 'BUY', 
+          symbol: 'EURUSD',
+          volume: 0.1,
+          trailDistance: 50,
+          trailStep: 10
         }
       }
     };
@@ -704,6 +720,12 @@ class NodeEditor {
         break;
       case 'trade-signal':
         console.log('Executing trade:', node.params.action, node.params.symbol, node.params.volume);
+        break;
+      case 'trade-trailing':
+        console.log('Executing trailing trade:', node.params.action, node.params.symbol, 
+                    'Volume:', node.params.volume, 
+                    'Trail Distance:', node.params.trailDistance, 'pips',
+                    'Trail Step:', node.params.trailStep, 'pips');
         break;
     }
     

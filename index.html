@@ -13,11 +13,13 @@
       <div class="toolbar-left">
         <h1>MT5 Strategy Builder</h1>
         <div id="connectionStatus" class="status disconnected">Disconnected</div>
+        <button id="showLogBtn" class="btn btn-secondary">Show Log</button>
       </div>
       <div class="toolbar-right">
         <button id="connectBtn" class="btn btn-primary">Connect MT5</button>
         <button id="tradeBtn" class="btn btn-success">New Trade</button>
-        <button id="showLogBtn" class="btn btn-secondary">Show Log</button>
+        <button id="backtestBtn" class="btn btn-info">Backtest</button>
+        <button id="overtradeConfigBtn" class="btn btn-warning">Overtrade Control</button>
         <button id="executeGraphBtn" class="btn btn-success">Execute Strategy</button>
         <button id="saveGraphBtn" class="btn btn-secondary">Save</button>
         <button id="loadGraphBtn" class="btn btn-secondary">Load</button>
@@ -56,6 +58,7 @@
           <div class="node-category">
             <h4>Trading</h4>
             <button class="node-btn" data-type="trade-signal">Trade</button>
+            <button class="node-btn" data-type="trade-trailing">Trailing Trade</button>
           </div>
         </div>
 
@@ -75,6 +78,42 @@
             <h3>Properties</h3>
             <div id="nodeProperties">
               <p class="no-selection">Select a node to edit properties</p>
+            </div>
+          </div>
+
+          <!-- Overtrade Reminder Panel -->
+          <div class="overtrade-reminder-panel" id="overtradeReminderPanel">
+            <h3>Trade Monitor</h3>
+            <div class="overtrade-status-display" id="overtradeStatusDisplay">
+              <div class="overtrade-indicator" id="overtradeIndicator">
+                <div class="indicator-icon" id="indicatorIcon">✅</div>
+                <div class="indicator-text" id="indicatorText">Safe Trading</div>
+              </div>
+              <div class="trade-count-info">
+                <div class="count-item">
+                  <span class="count-label">Current Period:</span>
+                  <span class="count-value" id="currentTradeCount">0</span>
+                </div>
+                <div class="count-item">
+                  <span class="count-label">Limit:</span>
+                  <span class="count-value" id="tradeLimit">5</span>
+                </div>
+                <div class="count-item">
+                  <span class="count-label">Time Period:</span>
+                  <span class="count-value" id="timePeriodDisplay">hour</span>
+                </div>
+                <div class="count-item">
+                  <span class="count-label">Next Reset:</span>
+                  <span class="count-value" id="nextResetTime">-</span>
+                </div>
+              </div>
+              <div class="overtrade-message" id="overtradeMessage" style="display: none;">
+                <div class="message-icon">⚠️</div>
+                <div class="message-text">
+                  <strong>Overtrade Alert!</strong><br>
+                  Consider reviewing your trading strategy.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -174,6 +213,18 @@
 
     <div id="messageBox" class="message-box"></div>
 
+    <!-- Overtrade Popup Notification -->
+    <div id="overtradePopup" class="overtrade-popup" style="display: none;">
+      <div class="overtrade-popup-content">
+        <div class="overtrade-popup-icon">🚨</div>
+        <div class="overtrade-popup-text">
+          <div class="overtrade-popup-title">🔥 DANGER! OVERTRADE DETECTED! 🔥</div>
+          <div class="overtrade-popup-message" id="overtradePopupMessage">⚡ STOP! Too many trades detected! ⚡</div>
+        </div>
+        <button class="overtrade-popup-close" id="overtradePopupClose">×</button>
+      </div>
+    </div>
+
     <!-- Log Modal -->
     <div id="logModal" class="modal">
       <div class="modal-content log-modal">
@@ -187,6 +238,173 @@
         </div>
         <div class="modal-buttons">
           <button id="closeLogBtn" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backtest Modal -->
+    <div id="backtestModal" class="modal">
+      <div class="modal-content">
+        <h2>Backtest Mode - Select Data Source</h2>
+        <div class="import-tabs">
+          <button class="tab-btn active" data-tab="mt5">From MT5</button>
+          <button class="tab-btn" data-tab="csv">From CSV</button>
+        </div>
+        
+        <!-- MT5 Import Tab -->
+        <div id="mt5ImportTab" class="import-tab active">
+          <div class="form-group">
+            <label>Symbol:</label>
+            <div id="historySymbolInput"></div>
+          </div>
+          <div class="form-group">
+            <label>Timeframe:</label>
+            <select id="historyTimeframe">
+              <option value="M1">M1 (1 Minute)</option>
+              <option value="M5">M5 (5 Minutes)</option>
+              <option value="M15">M15 (15 Minutes)</option>
+              <option value="M30">M30 (30 Minutes)</option>
+              <option value="H1" selected>H1 (1 Hour)</option>
+              <option value="H4">H4 (4 Hours)</option>
+              <option value="D1">D1 (Daily)</option>
+              <option value="W1">W1 (Weekly)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Start Date:</label>
+            <input type="date" id="historyStartDate">
+          </div>
+          <div class="form-group">
+            <label>End Date:</label>
+            <input type="date" id="historyEndDate">
+          </div>
+          <div class="form-group">
+            <label>Number of Bars (optional):</label>
+            <input type="number" id="historyBars" placeholder="Leave empty to use date range" min="1">
+          </div>
+        </div>
+        
+        <!-- CSV Import Tab -->
+        <div id="csvImportTab" class="import-tab">
+          <div class="form-group">
+            <label>Upload CSV File:</label>
+            <input type="file" id="csvFileInput" accept=".csv">
+            <p class="help-text">CSV format: Date,Time,Open,High,Low,Close,Volume</p>
+          </div>
+          <div class="form-group">
+            <label>Symbol Name:</label>
+            <input type="text" id="csvSymbol" placeholder="e.g., EURUSD">
+          </div>
+        </div>
+        
+        <div id="historyStatus" class="history-status"></div>
+        
+        <div class="modal-buttons">
+          <button id="confirmImportBtn" class="btn btn-primary">Start Backtest</button>
+          <button id="cancelImportBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overtrade Control Modal -->
+    <div id="overtradeModal" class="modal">
+      <div class="modal-content">
+        <h2>Overtrade Reminder Settings</h2>
+        <div class="form-group">
+          <label>Enable Overtrade Reminders:</label>
+          <select id="overtradeEnabled">
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Warning Threshold (trades per period):</label>
+          <input type="number" id="maxTrades" min="1" value="5" placeholder="e.g., 5">
+          <small>Show warning when this many trades are executed</small>
+        </div>
+        <div class="form-group">
+          <label>Time Period:</label>
+          <select id="timePeriod">
+            <option value="minute">Per Minute</option>
+            <option value="hour" selected>Per Hour</option>
+            <option value="day">Per Day</option>
+            <option value="week">Per Week</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reminder Frequency:</label>
+          <select id="reminderFrequency">
+            <option value="every">Every trade after threshold</option>
+            <option value="first" selected>Only first time threshold is reached</option>
+            <option value="periodic">Every 3 trades after threshold</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Apply reminders to:</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" id="applyToManual" checked> Manual Trades</label>
+            <label><input type="checkbox" id="applyToStrategy" checked> Strategy Trades</label>
+            <label><input type="checkbox" id="applyToNodes" checked> Node-based Trades</label>
+          </div>
+        </div>
+        <div class="overtrade-status">
+          <h3>Current Status</h3>
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="label">Trades in Current Period:</span>
+              <span id="currentTradeCount">0</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Until Warning Threshold:</span>
+              <span id="remainingTrades">5</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Period Resets:</span>
+              <span id="nextReset">-</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Last Warning:</span>
+              <span id="lastWarning">Never</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-buttons">
+          <button id="saveOvertradeBtn" class="btn btn-primary">Save Settings</button>
+          <button id="resetTradeCountBtn" class="btn btn-warning">Reset Count</button>
+          <button id="testOvertradeBtn" class="btn btn-info">Test (Add 5 Trades)</button>
+          <button id="cancelOvertradeBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overtrade Warning Modal -->
+    <div id="overtradeWarningModal" class="modal">
+      <div class="modal-content">
+        <h2>⚠️ Overtrade Reminder</h2>
+        <div class="overtrade-warning-content">
+          <p>You have executed <strong id="warningTradeCount">5</strong> trades in the last <strong id="warningTimePeriod">hour</strong>.</p>
+          <div class="warning-details">
+            <div class="warning-item">
+              <span>Current trade frequency:</span>
+              <span id="warningFrequency">5 trades/hour</span>
+            </div>
+            <div class="warning-item">
+              <span>Time period started:</span>
+              <span id="warningPeriodStart">-</span>
+            </div>
+            <div class="warning-item">
+              <span>Next reset:</span>
+              <span id="warningNextReset">-</span>
+            </div>
+          </div>
+          <div class="warning-message">
+            <p>Consider reviewing your trading strategy to avoid overtrading. You can still proceed with this trade.</p>
+          </div>
+        </div>
+        <div class="modal-buttons">
+          <button id="proceedTradeBtn" class="btn btn-primary">Proceed with Trade</button>
+          <button id="cancelTradeFromWarningBtn" class="btn btn-secondary">Cancel Trade</button>
+          <button id="disableRemindersBtn" class="btn btn-warning btn-small">Disable Reminders</button>
         </div>
       </div>
     </div>
@@ -270,6 +488,8 @@
 
   <script src="symbol-input.js"></script>
   <script src="node-editor.js"></script>
+  <script src="history-import.js"></script>
+  <script src="overtrade-control.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

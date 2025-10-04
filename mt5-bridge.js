@@ -35,7 +35,7 @@ class MT5Bridge {
         console.log(`Launching MT5 from: ${mt5Path}`);
         this.mt5Process = spawn(mt5Path, [], { detached: true, stdio: 'ignore' });
         this.mt5Process.unref();
-        
+
         // Wait for MT5 to start
         setTimeout(resolve, 3000);
       } else {
@@ -48,26 +48,26 @@ class MT5Bridge {
   startPythonBridge() {
     return new Promise((resolve, reject) => {
       const pythonScript = path.join(__dirname, 'mt5_bridge.py');
-      
+
       // Start Python bridge
       this.pythonProcess = spawn('python', [pythonScript]);
-      
+
       this.pythonProcess.stdout.on('data', (data) => {
         console.log(`Python Bridge: ${data}`);
         if (data.toString().includes('WebSocket server started')) {
           resolve();
         }
       });
-      
+
       this.pythonProcess.stderr.on('data', (data) => {
         console.error(`Python Bridge Error: ${data}`);
       });
-      
+
       this.pythonProcess.on('close', (code) => {
         console.log(`Python bridge exited with code ${code}`);
         this.connected = false;
       });
-      
+
       // Give it time to start
       setTimeout(resolve, 2000);
     });
@@ -76,17 +76,17 @@ class MT5Bridge {
   async connectWebSocket() {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket('ws://localhost:8765');
-      
+
       this.ws.on('open', () => {
         console.log('Connected to Python MT5 bridge');
         resolve();
       });
-      
+
       this.ws.on('message', (data) => {
         try {
           const response = JSON.parse(data.toString());
           const messageId = response.messageId;
-          
+
           // Only log MT5 responses for trade execution
           if (response.action === 'executeOrder') {
             console.log('MT5 Trade Response received:', {
@@ -98,7 +98,7 @@ class MT5Bridge {
               timestamp: new Date().toISOString()
             });
           }
-          
+
           if (this.messageQueue.has(messageId)) {
             const { resolve } = this.messageQueue.get(messageId);
             this.messageQueue.delete(messageId);
@@ -108,12 +108,12 @@ class MT5Bridge {
           console.error('Error parsing WebSocket message:', error);
         }
       });
-      
+
       this.ws.on('error', (error) => {
         console.error('WebSocket error:', error);
         reject(error);
       });
-      
+
       this.ws.on('close', () => {
         console.log('WebSocket connection closed');
         this.connected = false;
@@ -125,11 +125,11 @@ class MT5Bridge {
     return new Promise((resolve, reject) => {
       const messageId = this.messageId++;
       const message = { action, messageId, ...data };
-      
+
       this.messageQueue.set(messageId, { resolve, reject });
-      
+
       this.ws.send(JSON.stringify(message));
-      
+
       // Timeout after 10 seconds
       setTimeout(() => {
         if (this.messageQueue.has(messageId)) {
@@ -144,20 +144,20 @@ class MT5Bridge {
     try {
       // Launch MT5 if not running
       await this.launchMT5();
-      
+
       // Start Python bridge
       await this.startPythonBridge();
-      
+
       // Connect WebSocket
       await this.connectWebSocket();
-      
+
       // Connect to MT5
       const response = await this.sendMessage('connect', {
         login: config.login,
         password: config.password,
         server: config.server
       });
-      
+
       this.connected = response.success;
       return this.connected;
     } catch (error) {
@@ -170,7 +170,7 @@ class MT5Bridge {
     if (!this.connected) {
       throw new Error('Not connected to MT5');
     }
-    
+
     const response = await this.sendMessage('getAccountInfo');
     return response.data;
   }
@@ -181,7 +181,7 @@ class MT5Bridge {
     }
 
     console.log('Executing strategy:', strategy);
-    
+
     const response = await this.sendMessage('executeOrder', {
       symbol: strategy.symbol,
       type: strategy.type,
@@ -218,10 +218,10 @@ class MT5Bridge {
     }
 
     console.log('Modifying position:', ticket, 'SL:', stopLoss, 'TP:', takeProfit);
-    const response = await this.sendMessage('modifyPosition', { 
-      ticket, 
-      stopLoss, 
-      takeProfit 
+    const response = await this.sendMessage('modifyPosition', {
+      ticket,
+      stopLoss,
+      takeProfit
     });
     return response.data;
   }
@@ -232,7 +232,7 @@ class MT5Bridge {
     }
 
     console.log('Executing node-based strategy:', nodeGraph);
-    
+
     const response = await this.sendMessage('executeNodeStrategy', { nodeGraph });
     return response.data || {
       success: true,
@@ -289,6 +289,22 @@ class MT5Bridge {
       volume: orderData.volume,
       stopLoss: orderData.stopLoss || 0,
       takeProfit: orderData.takeProfit || 0
+    });
+
+    return response.data;
+  }
+
+  async getHistoricalData(symbol, timeframe, startDate, endDate, bars) {
+    if (!this.connected) {
+      throw new Error('Not connected to MT5');
+    }
+
+    const response = await this.sendMessage('getHistoricalData', {
+      symbol,
+      timeframe,
+      startDate,
+      endDate,
+      bars
     });
 
     return response.data;

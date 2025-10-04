@@ -151,3 +151,12 @@ ipcMain.handle('mt5:executeOrder', async (event, orderData) => {
         return { success: false, error: error.message };
     }
 });
+
+ipcMain.handle('mt5:getHistoricalData', async (event, { symbol, timeframe, startDate, endDate, bars }) => {
+    try {
+        const result = await mt5Bridge.getHistoricalData(symbol, timeframe, startDate, endDate, bars);
+        return { success: true, data: result };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});

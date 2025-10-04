@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld('mt5API', {
   getSymbolInfo: (symbol) => ipcRenderer.invoke('mt5:getSymbolInfo', symbol),
   getSymbols: (group) => ipcRenderer.invoke('mt5:getSymbols', group),
   searchSymbols: (query) => ipcRenderer.invoke('mt5:searchSymbols', query),
-  executeOrder: (orderData) => ipcRenderer.invoke('mt5:executeOrder', orderData)
+  executeOrder: (orderData) => ipcRenderer.invoke('mt5:executeOrder', orderData),
+  getHistoricalData: (params) => ipcRenderer.invoke('mt5:getHistoricalData', params)
 });
