@@ -138,10 +138,23 @@ class OvertradeControl {
   }
 
   recordTrade(tradeType, tradeData = {}) {
+    // Only record trades that open new positions
+    const isNewPosition = this.isNewPositionTrade(tradeData);
+    
+    if (!isNewPosition) {
+      console.log('Trade not recorded - not a new position:', {
+        type: tradeType,
+        action: tradeData.action || 'unknown',
+        data: tradeData
+      });
+      return;
+    }
+    
     const trade = {
       timestamp: Date.now(),
       type: tradeType,
-      data: tradeData
+      data: tradeData,
+      action: tradeData.action || 'new_position'
     };
     
     this.tradeHistory.push(trade);
@@ -152,11 +165,31 @@ class OvertradeControl {
     // Update display
     this.updateStatusDisplay();
     
-    console.log('Trade recorded:', {
+    console.log('New position trade recorded:', {
       type: tradeType,
-      totalTrades: this.tradeHistory.length,
-      currentPeriodTrades: this.getCurrentPeriodTrades()
+      action: trade.action,
+      totalNewPositions: this.tradeHistory.length,
+      currentPeriodNewPositions: this.getCurrentPeriodTrades()
     });
+  }
+
+  isNewPositionTrade(tradeData) {
+    // Check if this is a new position trade vs position management
+    const action = tradeData.action;
+    
+    // Explicitly exclude position management actions
+    if (action === 'closePosition' || action === 'modifyPosition') {
+      return false;
+    }
+    
+    // Include new position actions
+    if (action === 'executeOrder' || action === 'executeStrategy' || action === 'executeNodeStrategy') {
+      return true;
+    }
+    
+    // For manual trades and other cases, assume it's a new position unless specified otherwise
+    // This maintains backward compatibility
+    return true;
   }
 
   checkAndShowReminder(tradeType, tradeData = {}) {
@@ -213,23 +246,23 @@ class OvertradeControl {
     this.updatePersistentPanel(currentTrades);
     
     // Show message notification for immediate feedback
-    const alertMessage = `⚠️ Overtrade Alert: ${currentTrades} trades in the last ${this.settings.timePeriod}!`;
+    const alertMessage = `⚠️ New Position Alert: ${currentTrades} new positions in the last ${this.settings.timePeriod}!`;
     
     if (typeof showMessage === 'function') {
       showMessage(alertMessage, 'error');
       
       // Show additional popup after a short delay for emphasis
       setTimeout(() => {
-        showMessage(`Trading frequency: ${currentTrades}/${this.settings.maxTrades} trades per ${this.settings.timePeriod}`, 'warning');
+        showMessage(`New position frequency: ${currentTrades}/${this.settings.maxTrades} per ${this.settings.timePeriod}`, 'warning');
       }, 3500);
     }
     
     // Also log to console for debugging
-    console.warn('Overtrade detected:', {
-      currentTrades,
+    console.warn('New position limit exceeded:', {
+      currentNewPositions: currentTrades,
       threshold: this.settings.maxTrades,
       timePeriod: this.settings.timePeriod,
-      frequency: `${currentTrades} trades/${this.settings.timePeriod}`
+      frequency: `${currentTrades} new positions/${this.settings.timePeriod}`
     });
   }
 
@@ -377,7 +410,7 @@ class OvertradeControl {
       if (countEl) countEl.classList.add('danger');
       
       if (icon) icon.textContent = '🚨';
-      if (text) text.textContent = 'OVERTRADE ALERT!';
+      if (text) text.textContent = 'NEW POSITION LIMIT EXCEEDED!';
       if (messageEl) messageEl.style.display = 'flex';
     } else if (isNearLimit) {
       // Warning state - near limit
@@ -388,12 +421,12 @@ class OvertradeControl {
       if (countEl) countEl.classList.add('warning');
       
       if (icon) icon.textContent = '⚠️';
-      if (text) text.textContent = 'Approaching Limit';
+      if (text) text.textContent = 'Approaching New Position Limit';
       if (messageEl) messageEl.style.display = 'none';
     } else {
       // Safe state
       if (icon) icon.textContent = '✅';
-      if (text) text.textContent = 'Safe Trading';
+      if (text) text.textContent = 'Safe - New Positions';
       if (messageEl) messageEl.style.display = 'none';
     }
   }
@@ -456,6 +489,18 @@ class OvertradeControl {
   // Public method to check before executing trades
   async checkBeforeTrade(tradeType, tradeData = {}) {
     return await this.checkAndShowReminder(tradeType, tradeData);
+  }
+
+  // Method to record position management actions (doesn't count towards overtrade)
+  recordPositionManagement(action, tradeData = {}) {
+    console.log('Position management action recorded (not counted for overtrade):', {
+      action,
+      data: tradeData,
+      timestamp: new Date().toLocaleString()
+    });
+    
+    // Could store these separately if needed for analytics
+    // For now, just log them
   }
 
   // Get current status for display
@@ -547,13 +592,14 @@ class OvertradeControl {
     return {
       enabled: this.settings.enabled,
       settings: this.settings,
-      totalTradesRecorded: this.tradeHistory.length,
-      currentPeriodTrades: this.getCurrentPeriodTrades(),
-      oldestTrade: this.tradeHistory.length > 0 ? new Date(this.tradeHistory[0].timestamp).toLocaleString() : 'None',
-      newestTrade: this.tradeHistory.length > 0 ? new Date(this.tradeHistory[this.tradeHistory.length - 1].timestamp).toLocaleString() : 'None',
+      totalNewPositionsRecorded: this.tradeHistory.length,
+      currentPeriodNewPositions: this.getCurrentPeriodTrades(),
+      oldestNewPosition: this.tradeHistory.length > 0 ? new Date(this.tradeHistory[0].timestamp).toLocaleString() : 'None',
+      newestNewPosition: this.tradeHistory.length > 0 ? new Date(this.tradeHistory[this.tradeHistory.length - 1].timestamp).toLocaleString() : 'None',
       lastWarning: this.lastWarningTime ? new Date(this.lastWarningTime).toLocaleString() : 'Never',
       warningCount: this.warningCount,
-      nextReset: new Date(Date.now() + this.getTimePeriodMs()).toLocaleString()
+      nextReset: new Date(Date.now() + this.getTimePeriodMs()).toLocaleString(),
+      note: 'Only new position openings are counted. Position closures and modifications are not counted.'
     };
   }
 }
@@ -562,4 +608,4 @@ class OvertradeControl {
 window.overtradeControl = new OvertradeControl();
 
 // Add console helper for debugging
-console.log('Overtrade Control initialized. Use window.overtradeControl.getDetailedStatus() to check status.');
+console.log('Overtrade Control initialized. Only new position openings are counted - closures and modifications are ignored. Use window.overtradeControl.getDetailedStatus() to check status.');

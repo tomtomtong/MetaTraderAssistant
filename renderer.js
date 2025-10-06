@@ -377,7 +377,7 @@ async function handleExecuteTrade() {
   }
 
   // Check overtrade control before proceeding
-  const tradeData = { symbol, type, volume, stopLoss, takeProfit };
+  const tradeData = { symbol, type, volume, stopLoss, takeProfit, action: 'executeOrder' };
   const shouldProceed = await window.overtradeControl.checkBeforeTrade('manual', tradeData);
   
   if (!shouldProceed) {
@@ -502,6 +502,9 @@ async function closePosition(ticket) {
     return;
   }
 
+  // Record position management action (doesn't count for overtrade)
+  window.overtradeControl.recordPositionManagement('closePosition', { ticket });
+
   showMessage('Closing position...', 'info');
 
   const result = await window.mt5API.closePosition(ticket);
@@ -540,6 +543,9 @@ async function handleModifyPosition() {
   const takeProfit = tpValue ? parseFloat(tpValue) : 0;
 
   hideModifyModal();
+  // Record position management action (doesn't count for overtrade)
+  window.overtradeControl.recordPositionManagement('modifyPosition', { ticket, stopLoss, takeProfit });
+
   showMessage('Modifying position...', 'info');
 
   const result = await window.mt5API.modifyPosition(ticket, stopLoss, takeProfit);
@@ -630,7 +636,7 @@ async function handleRunStrategy() {
   hideRunStrategyModal();
 
   // Check overtrade control for node-based strategies
-  const shouldProceed = await window.overtradeControl.checkBeforeTrade('node', { nodeCount: nodeEditor.nodes.length });
+  const shouldProceed = await window.overtradeControl.checkBeforeTrade('node', { nodeCount: nodeEditor.nodes.length, action: 'executeNodeStrategy' });
   
   if (!shouldProceed) {
     showMessage('Node strategy execution cancelled', 'info');
