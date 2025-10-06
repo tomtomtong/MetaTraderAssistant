@@ -5,6 +5,7 @@ let symbolInput = null;
 let logEntries = [];
 let isStrategyRunning = false;
 let strategyStopRequested = false;
+let currentPositions = []; // Store current positions for dropdown selection
 
 // Override console methods to capture logs
 const originalConsole = {
@@ -466,6 +467,7 @@ async function handleRefreshPositions() {
 
   if (result.success) {
     const positions = result.data;
+    currentPositions = positions; // Store positions globally for dropdown access
     const container = document.getElementById('positionsList');
 
     if (positions.length === 0) {
@@ -874,6 +876,86 @@ function updatePropertiesPanel(node) {
                    onchange="updateNodeParam('${key}', parseInt(this.value))">
           </div>
         `;
+      } else if (key === 'ticket' && (node.type === 'close-position' || node.type === 'modify-position')) {
+        const positionOptions = currentPositions.map(pos => 
+          `<option value="${pos.ticket}" ${value == pos.ticket ? 'selected' : ''}>
+            ${pos.ticket} - ${pos.symbol} ${pos.type} (${pos.volume})
+          </option>`
+        ).join('');
+        
+        const onChangeHandler = node.type === 'modify-position' 
+          ? `onchange="window.updateNodeParamAndLoadPosition('${key}', this.value, '${node.id}')"` 
+          : `onchange="window.updateNodeParam('${key}', this.value)"`;
+        
+        const noPositionsMsg = currentPositions.length === 0 
+          ? '<small style="color: #ff9800;">No positions loaded. Click "Refresh Positions" button below.</small>' 
+          : '';
+        
+        return `
+          <div class="property-item">
+            <label>Select Position:</label>
+            <select data-param="${key}" ${onChangeHandler}>
+              <option value="">Select a position...</option>
+              ${positionOptions}
+            </select>
+            ${noPositionsMsg}
+          </div>
+        `;
+      } else if (key === 'closeType' && node.type === 'close-position') {
+        return `
+          <div class="property-item">
+            <label>${key}:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
+              <option value="all" ${value === 'all' ? 'selected' : ''}>Close All</option>
+              <option value="partial" ${value === 'partial' ? 'selected' : ''}>Partial Close</option>
+              <option value="specific" ${value === 'specific' ? 'selected' : ''}>Specific Ticket</option>
+            </select>
+          </div>
+        `;
+      } else if ((key === 'stopLoss' || key === 'takeProfit') && node.type === 'modify-position') {
+        return `
+          <div class="property-item">
+            <label>${key}:</label>
+            <input type="number" 
+                   value="${value}" 
+                   step="0.00001"
+                   placeholder="0 for none"
+                   data-param="${key}"
+                   onchange="updateNodeParam('${key}', parseFloat(this.value) || 0)">
+          </div>
+        `;
+      } else if (key === 'confirmAction' && node.type === 'close-all-positions') {
+        return `
+          <div class="property-item">
+            <label>Require Confirmation:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value === 'true')">
+              <option value="true" ${value ? 'selected' : ''}>Yes</option>
+              <option value="false" ${!value ? 'selected' : ''}>No</option>
+            </select>
+          </div>
+        `;
+      } else if (key === 'filterBySymbol' && node.type === 'close-all-positions') {
+        return `
+          <div class="property-item">
+            <label>Filter by Symbol:</label>
+            <input type="text" 
+                   value="${value}" 
+                   placeholder="Leave empty for all symbols"
+                   data-param="${key}"
+                   onchange="updateNodeParam('${key}', this.value)">
+          </div>
+        `;
+      } else if (key === 'filterByType' && node.type === 'close-all-positions') {
+        return `
+          <div class="property-item">
+            <label>Filter by Type:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
+              <option value="all" ${value === 'all' ? 'selected' : ''}>All Positions</option>
+              <option value="BUY" ${value === 'BUY' ? 'selected' : ''}>Buy Only</option>
+              <option value="SELL" ${value === 'SELL' ? 'selected' : ''}>Sell Only</option>
+            </select>
+          </div>
+        `;
       } else {
         return `
           <div class="property-item">
@@ -915,6 +997,24 @@ function updatePropertiesPanel(node) {
     actionButtons += `
       <button class="btn btn-info btn-small" onclick="testSignalPopup('${node.id}')">
         Test Popup
+      </button>
+    `;
+  }
+  
+  // Add load current values button for modify-position node
+  if (node.type === 'modify-position' && node.params.ticket) {
+    actionButtons += `
+      <button class="btn btn-secondary btn-small" onclick="loadCurrentPositionValues('${node.id}')">
+        Load Current Values
+      </button>
+    `;
+  }
+  
+  // Add test button for close-all-positions node
+  if (node.type === 'close-all-positions') {
+    actionButtons += `
+      <button class="btn btn-warning btn-small" onclick="testCloseAllPositions('${node.id}')">
+        Test Close All
       </button>
     `;
   }
@@ -985,6 +1085,63 @@ window.updateNodeParam = function(key, value) {
   }
 };
 
+window.updateNodeParamAndLoadPosition = function(key, ticketValue, nodeId) {
+  console.log('updateNodeParamAndLoadPosition called:', { key, ticketValue, nodeId });
+  
+  // Find the node - try both string and number comparison
+  const node = nodeEditor.nodes.find(n => n.id == nodeId || String(n.id) === String(nodeId));
+  
+  if (!node) {
+    console.error('Node not found:', nodeId, 'Available nodes:', nodeEditor.nodes.map(n => n.id));
+    showMessage('Error: Node not found', 'error');
+    return;
+  }
+  
+  console.log('Found node:', node);
+  
+  // Update the ticket parameter
+  node.params[key] = ticketValue;
+  
+  // If a position is selected, load its current SL/TP values
+  if (ticketValue && ticketValue !== '' && node.type === 'modify-position') {
+    console.log('Looking for position with ticket:', ticketValue, 'Type:', typeof ticketValue);
+    console.log('Available positions:', currentPositions.length, currentPositions);
+    
+    if (currentPositions.length === 0) {
+      showMessage('No positions loaded. Please click "Refresh Positions" first.', 'warning');
+      return;
+    }
+    
+    // Try to find position with flexible comparison
+    const selectedPosition = currentPositions.find(pos => {
+      const match = String(pos.ticket) === String(ticketValue) || pos.ticket == ticketValue;
+      console.log(`Comparing pos.ticket ${pos.ticket} with ${ticketValue}: ${match}`);
+      return match;
+    });
+    
+    if (selectedPosition) {
+      console.log('Found position:', selectedPosition);
+      
+      // Update the node parameters with current position values
+      node.params.stopLoss = selectedPosition.stop_loss || 0;
+      node.params.takeProfit = selectedPosition.take_profit || 0;
+      
+      // Refresh the properties panel to show the updated values
+      updatePropertiesPanel(node);
+      
+      const slDisplay = selectedPosition.stop_loss ? selectedPosition.stop_loss.toFixed(5) : 'None';
+      const tpDisplay = selectedPosition.take_profit ? selectedPosition.take_profit.toFixed(5) : 'None';
+      showMessage(`Loaded: SL=${slDisplay}, TP=${tpDisplay}`, 'success');
+    } else {
+      console.error('Position not found in currentPositions array');
+      console.error('Searched for ticket:', ticketValue, 'in', currentPositions.map(p => p.ticket));
+      showMessage('Position not found. Try refreshing positions first.', 'warning');
+    }
+  } else {
+    console.log('Skipping position load:', { ticketValue, nodeType: node.type });
+  }
+};
+
 // Handle trigger execution
 window.onTriggerExecute = function(triggerNode, connectedNodes) {
   showMessage(`Trigger "${triggerNode.title}" executed! Connected to ${connectedNodes.length} nodes`, 'success');
@@ -1030,6 +1187,121 @@ window.getCurrentPriceForNode = async function(nodeId) {
     }
   } catch (error) {
     showMessage('Error getting current price: ' + error.message, 'error');
+  }
+};
+
+window.refreshPositionsForNode = async function(nodeId) {
+  if (!isConnected) {
+    showMessage('Please connect to MT5 first', 'error');
+    return;
+  }
+  
+  try {
+    await handleRefreshPositions();
+    
+    // Update the properties panel to refresh the dropdown
+    const node = nodeEditor.nodes.find(n => n.id === nodeId);
+    if (node) {
+      updatePropertiesPanel(node);
+    }
+    
+    showMessage(`Positions refreshed! Found ${currentPositions.length} open positions`, 'success');
+  } catch (error) {
+    showMessage('Error refreshing positions: ' + error.message, 'error');
+  }
+};
+
+window.previewCloseAllPositions = async function(nodeId) {
+  if (!isConnected) {
+    showMessage('Please connect to MT5 first', 'error');
+    return;
+  }
+  
+  const node = nodeEditor.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  
+  try {
+    await handleRefreshPositions();
+    
+    // Filter positions based on node parameters
+    let filteredPositions = currentPositions;
+    
+    if (node.params.filterBySymbol && node.params.filterBySymbol.trim()) {
+      filteredPositions = filteredPositions.filter(pos => 
+        pos.symbol.toUpperCase() === node.params.filterBySymbol.toUpperCase()
+      );
+    }
+    
+    if (node.params.filterByType && node.params.filterByType !== 'all') {
+      filteredPositions = filteredPositions.filter(pos => 
+        pos.type === node.params.filterByType
+      );
+    }
+    
+    if (filteredPositions.length === 0) {
+      showMessage('No positions match the current filters', 'info');
+    } else {
+      const positionList = filteredPositions.map(pos => 
+        `${pos.ticket} - ${pos.symbol} ${pos.type} (${pos.volume})`
+      ).join('\n');
+      
+      showMessage(`Found ${filteredPositions.length} positions to close:\n${positionList}`, 'info');
+    }
+  } catch (error) {
+    showMessage('Error previewing positions: ' + error.message, 'error');
+  }
+};
+
+window.testCloseAllPositions = async function(nodeId) {
+  const node = nodeEditor.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  
+  if (node.params.confirmAction) {
+    if (!confirm('This will close ALL matching positions. Are you sure you want to continue?')) {
+      showMessage('Close all positions cancelled', 'info');
+      return;
+    }
+  }
+  
+  showMessage('Test: Close All Positions would execute here', 'warning');
+  console.log('Close All Positions Test:', {
+    filterBySymbol: node.params.filterBySymbol,
+    filterByType: node.params.filterByType,
+    confirmAction: node.params.confirmAction
+  });
+};
+
+window.loadCurrentPositionValues = async function(nodeId) {
+  const node = nodeEditor.nodes.find(n => n.id === nodeId);
+  if (!node || !node.params.ticket) {
+    showMessage('Please select a position first', 'error');
+    return;
+  }
+  
+  if (!isConnected) {
+    showMessage('Please connect to MT5 first', 'error');
+    return;
+  }
+  
+  try {
+    // Refresh positions to get latest data
+    await handleRefreshPositions();
+    
+    const selectedPosition = currentPositions.find(pos => pos.ticket == node.params.ticket);
+    if (selectedPosition) {
+      // Update the node parameters with current position values
+      node.params.stopLoss = selectedPosition.stop_loss || 0;
+      node.params.takeProfit = selectedPosition.take_profit || 0;
+      
+      // Refresh the properties panel to show the updated values
+      updatePropertiesPanel(node);
+      
+      showMessage(`Current values loaded - SL: ${selectedPosition.stop_loss || 'None'}, TP: ${selectedPosition.take_profit || 'None'}`, 'success');
+    } else {
+      showMessage('Position not found. It may have been closed.', 'warning');
+    }
+  } catch (error) {
+    showMessage('Error loading position values: ' + error.message, 'error');
   }
 };
 

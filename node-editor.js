@@ -223,7 +223,6 @@ class NodeEditor {
         inputs: ['trigger'],
         outputs: [],
         params: { 
-          symbol: 'EURUSD',
           ticket: '',
           closeType: 'all'
         }
@@ -236,6 +235,16 @@ class NodeEditor {
           ticket: '',
           stopLoss: 0,
           takeProfit: 0
+        }
+      },
+      'close-all-positions': {
+        title: 'Close All Positions',
+        inputs: ['trigger'],
+        outputs: [],
+        params: { 
+          confirmAction: true,
+          filterBySymbol: '',
+          filterByType: 'all'
         }
       },
       'signal-popup': {
@@ -694,10 +703,13 @@ class NodeEditor {
         console.log('Executing trade:', node.params.action, node.params.symbol, node.params.volume);
         break;
       case 'close-position':
-        console.log('Closing position:', node.params.symbol, 'Ticket:', node.params.ticket, 'Type:', node.params.closeType);
+        console.log('Closing position:', 'Ticket:', node.params.ticket, 'Type:', node.params.closeType);
         break;
       case 'modify-position':
         console.log('Modifying position:', 'Ticket:', node.params.ticket, 'SL:', node.params.stopLoss, 'TP:', node.params.takeProfit);
+        break;
+      case 'close-all-positions':
+        console.log('Closing all positions:', 'Filter by symbol:', node.params.filterBySymbol, 'Filter by type:', node.params.filterByType);
         break;
       case 'signal-popup':
         console.log('Showing popup signal:', node.params.title, node.params.message);
