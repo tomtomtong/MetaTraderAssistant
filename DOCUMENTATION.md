@@ -80,9 +80,7 @@ An Electron desktop application for executing trading strategies on MetaTrader 5
 - Trigger input, no outputs
 - Action (BUY/SELL), symbol, and volume parameters
 
-**Trailing Trade**: Execute orders with automatic trailing stop loss
-- Trigger input, no outputs
-- Action (BUY/SELL), symbol, volume, trail distance, and trail step parameters
+
 - Trail distance: Distance in pips between current price and stop loss
 - Trail step: Minimum price movement in pips before adjusting stop loss
 - Automatically adjusts stop loss as price moves favorably
@@ -188,8 +186,8 @@ MetaTrader 5 API
 1. Add "Manual Trigger"
 2. Add "Moving Average" (period: 20)
 3. Add "Conditional Check" (price > MA)
-4. Add "Trailing Trade" (BUY, EURUSD, 0.1, trail: 50 pips, step: 10 pips)
-5. Connect nodes and execute - stop loss will trail price automatically
+4. Add "Trade" (BUY, EURUSD, 0.1)
+5. Connect nodes and execute
 
 ### Backtesting Workflow
 1. Import historical data (EURUSD, H1, last 30 days)

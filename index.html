@@ -13,6 +13,7 @@
       <div class="toolbar-left">
         <h1>MT5 Strategy Builder</h1>
         <div id="connectionStatus" class="status disconnected">Disconnected</div>
+        <div id="strategyStatus" class="status strategy-idle">Idle</div>
         <button id="showLogBtn" class="btn btn-secondary">Show Log</button>
       </div>
       <div class="toolbar-right">
@@ -20,7 +21,8 @@
         <button id="tradeBtn" class="btn btn-success">New Trade</button>
         <button id="backtestBtn" class="btn btn-info">Backtest</button>
         <button id="overtradeConfigBtn" class="btn btn-warning">Overtrade Control</button>
-        <button id="executeGraphBtn" class="btn btn-success">Execute Strategy</button>
+        <button id="runStrategyBtn" class="btn btn-success">▶ Run Strategy</button>
+        <button id="stopStrategyBtn" class="btn btn-danger" style="display: none;">⏹ Stop Strategy</button>
         <button id="saveGraphBtn" class="btn btn-secondary">Save</button>
         <button id="loadGraphBtn" class="btn btn-secondary">Load</button>
         <button id="clearGraphBtn" class="btn btn-danger">Clear</button>
@@ -36,8 +38,12 @@
           
           <div class="node-category">
             <h4>Triggers</h4>
-            <button class="node-btn trigger-btn" data-type="trigger-manual">⚡ Manual Trigger</button>
-            <button class="node-btn trigger-btn" data-type="trigger-period">⏱️ Period Trigger</button>
+            <button class="node-btn trigger-btn" data-type="trigger">⚡ Trigger</button>
+          </div>
+
+          <div class="node-category">
+            <h4>Signals</h4>
+            <button class="node-btn signal-btn" data-type="signal-popup">🔔 Popup Signal</button>
           </div>
 
 
@@ -57,8 +63,9 @@
 
           <div class="node-category">
             <h4>Trading</h4>
-            <button class="node-btn" data-type="trade-signal">Trade</button>
-            <button class="node-btn" data-type="trade-trailing">Trailing Trade</button>
+            <button class="node-btn" data-type="trade-signal">Open Position</button>
+            <button class="node-btn" data-type="close-position">Close Position</button>
+            <button class="node-btn" data-type="modify-position">Modify Position</button>
           </div>
         </div>
 
@@ -426,6 +433,65 @@
           <button id="proceedTradeBtn" class="btn btn-primary">Proceed with Trade</button>
           <button id="cancelTradeFromWarningBtn" class="btn btn-secondary">Cancel Trade</button>
           <button id="disableRemindersBtn" class="btn btn-warning btn-small">Disable Reminders</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Run Strategy Modal -->
+    <div id="runStrategyModal" class="modal">
+      <div class="modal-content">
+        <h2>▶ Run Strategy</h2>
+        <div class="run-strategy-content">
+          <p>Choose how to execute your strategy:</p>
+          <div class="run-options">
+            <div class="run-option">
+              <input type="radio" id="runOnce" name="runOption" value="once" checked>
+              <label for="runOnce">
+                <strong>Run Once</strong><br>
+                <small>Execute all triggers one time immediately</small>
+              </label>
+            </div>
+            <div class="run-option">
+              <input type="radio" id="runPeriodic" name="runOption" value="periodic">
+              <label for="runPeriodic">
+                <strong>Run Periodically</strong><br>
+                <small>Execute triggers repeatedly at specified intervals</small>
+              </label>
+            </div>
+          </div>
+          <div id="periodicSettings" style="display: none; margin-top: 15px;">
+            <div class="form-group">
+              <label>Interval:</label>
+              <input type="number" id="periodicInterval" min="1" value="60">
+            </div>
+            <div class="form-group">
+              <label>Unit:</label>
+              <select id="periodicUnit">
+                <option value="seconds">Seconds</option>
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-buttons">
+          <button id="confirmRunBtn" class="btn btn-success">Run Strategy</button>
+          <button id="cancelRunBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stop Strategy Modal -->
+    <div id="stopStrategyModal" class="modal">
+      <div class="modal-content">
+        <h2>⏹️ Stop Strategy</h2>
+        <div class="stop-strategy-content">
+          <p>Are you sure you want to stop the periodic strategy execution?</p>
+          <p><small>This will stop all periodic triggers but keep any open positions.</small></p>
+        </div>
+        <div class="modal-buttons">
+          <button id="confirmStopBtn" class="btn btn-danger">Stop Strategy</button>
+          <button id="cancelStopBtn" class="btn btn-secondary">Cancel</button>
         </div>
       </div>
     </div>

@@ -34,7 +34,7 @@ This application provides a comprehensive trading platform that connects to Meta
 - Conditional checks with live price comparison
 - Logic gates (AND, OR) for complex conditions
 - Trade signal nodes for order execution
-- Trailing trade nodes with automatic stop loss management
+
 
 ### Historical Data Import
 - Import data from MT5 (8 timeframes: M1-W1)
@@ -153,11 +153,10 @@ void OnTick() {
 - Trigger input, no outputs
 - Action (BUY/SELL), symbol, and volume parameters
 
-**Trailing Trade**: Execute orders with automatic trailing stop loss
-- Trigger input, no outputs
-- Action (BUY/SELL), symbol, volume, trail distance, and trail step parameters
-- Trail distance: Distance in pips between current price and stop loss
-- Trail step: Minimum price movement in pips before adjusting stop loss
+
+- Trail distance %: Percentage distance between current price and stop loss
+- Trail step %: Minimum percentage price movement before adjusting stop loss
+- Check period: Time interval in seconds for monitoring price changes
 - Automatically adjusts stop loss as price moves favorably
 
 ## Historical Data Import
@@ -237,8 +236,8 @@ Requirements:
 1. Add "Manual Trigger"
 2. Add "Moving Average" (period: 20)
 3. Add "Conditional Check" (price > MA)
-4. Add "Trailing Trade" (BUY, EURUSD, 0.1, trail: 50 pips, step: 10 pips)
-5. Connect nodes and execute - stop loss will trail price automatically
+4. Add "Trade" (BUY, EURUSD, 0.1)
+5. Connect nodes and execute
 
 ### Backtesting Workflow
 1. Import historical data (EURUSD, H1, last 30 days)

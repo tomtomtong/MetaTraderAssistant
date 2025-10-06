@@ -44,17 +44,8 @@ class NodeEditor {
       return;
     }
 
-    // Check for trigger button click
-    for (let node of this.nodes) {
-      if (node.type === 'trigger-manual' && node.params.enabled) {
-        const buttonPos = this.getTriggerButtonPos(node);
-        if (x >= buttonPos.x && x <= buttonPos.x + buttonPos.width &&
-            y >= buttonPos.y && y <= buttonPos.y + buttonPos.height) {
-          this.executeTrigger(node);
-          return;
-        }
-      }
-    }
+    // Trigger nodes don't have manual click buttons anymore
+    // They execute when Run Strategy is clicked
 
     // Check for output socket click (start connection)
     for (let node of this.nodes) {
@@ -177,24 +168,11 @@ class NodeEditor {
 
   getNodeConfig(type) {
     const configs = {
-      'trigger-manual': {
-        title: 'Manual Trigger',
+      'trigger': {
+        title: 'Trigger',
         inputs: [],
         outputs: ['trigger'],
-        params: { 
-          enabled: true,
-          description: 'Click to execute'
-        }
-      },
-      'trigger-period': {
-        title: 'Period Trigger',
-        inputs: [],
-        outputs: ['trigger'],
-        params: { 
-          enabled: true,
-          interval: 60,
-          unit: 'seconds'
-        }
+        params: {}
       },
       'indicator-ma': {
         title: 'Moving Average',
@@ -231,7 +209,7 @@ class NodeEditor {
         params: {}
       },
       'trade-signal': {
-        title: 'Trade',
+        title: 'Open Position',
         inputs: ['trigger'],
         outputs: [],
         params: { 
@@ -240,18 +218,39 @@ class NodeEditor {
           volume: 0.1
         }
       },
-      'trade-trailing': {
-        title: 'Trailing Trade',
+      'close-position': {
+        title: 'Close Position',
         inputs: ['trigger'],
         outputs: [],
         params: { 
-          action: 'BUY', 
           symbol: 'EURUSD',
-          volume: 0.1,
-          trailDistance: 50,
-          trailStep: 10
+          ticket: '',
+          closeType: 'all'
         }
-      }
+      },
+      'modify-position': {
+        title: 'Modify Position',
+        inputs: ['trigger'],
+        outputs: [],
+        params: { 
+          ticket: '',
+          stopLoss: 0,
+          takeProfit: 0
+        }
+      },
+      'signal-popup': {
+        title: 'Popup Signal',
+        inputs: ['trigger'],
+        outputs: ['trigger'],
+        params: { 
+          title: 'Signal Alert',
+          message: 'Trading signal triggered!',
+          type: 'info',
+          autoClose: true,
+          duration: 5000
+        }
+      },
+
     };
     
     // Return config or a default fallback for unknown types
@@ -473,14 +472,12 @@ class NodeEditor {
     ctx.textAlign = 'center';
     ctx.fillText(node.title, node.x + node.width / 2, node.y + 20);
     
-    // Draw trigger button for manual trigger
-    if (node.type === 'trigger-manual' && node.params.enabled) {
-      this.drawTriggerButton(node);
-    }
-    
-    // Draw status indicator for period trigger
-    if (node.type === 'trigger-period') {
-      this.drawPeriodStatus(node);
+    // Draw status indicator for trigger node
+    if (node.type === 'trigger') {
+      // Show periodic status if actively running
+      if (node.intervalId) {
+        this.drawPeriodStatus(node);
+      }
     }
 
     // Input sockets
@@ -623,31 +620,6 @@ class NodeEditor {
   }
 
   // Trigger-specific methods
-  getTriggerButtonPos(node) {
-    return {
-      x: node.x + 10,
-      y: node.y + node.height - 35,
-      width: node.width - 20,
-      height: 25
-    };
-  }
-
-  drawTriggerButton(node) {
-    const ctx = this.ctx;
-    const pos = this.getTriggerButtonPos(node);
-    
-    // Button background
-    ctx.fillStyle = '#4CAF50';
-    ctx.beginPath();
-    ctx.roundRect(pos.x, pos.y, pos.width, pos.height, 4);
-    ctx.fill();
-    
-    // Button text
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('▶ EXECUTE', pos.x + pos.width / 2, pos.y + 16);
-  }
 
   drawPeriodStatus(node) {
     const ctx = this.ctx;
@@ -721,12 +693,19 @@ class NodeEditor {
       case 'trade-signal':
         console.log('Executing trade:', node.params.action, node.params.symbol, node.params.volume);
         break;
-      case 'trade-trailing':
-        console.log('Executing trailing trade:', node.params.action, node.params.symbol, 
-                    'Volume:', node.params.volume, 
-                    'Trail Distance:', node.params.trailDistance, 'pips',
-                    'Trail Step:', node.params.trailStep, 'pips');
+      case 'close-position':
+        console.log('Closing position:', node.params.symbol, 'Ticket:', node.params.ticket, 'Type:', node.params.closeType);
         break;
+      case 'modify-position':
+        console.log('Modifying position:', 'Ticket:', node.params.ticket, 'SL:', node.params.stopLoss, 'TP:', node.params.takeProfit);
+        break;
+      case 'signal-popup':
+        console.log('Showing popup signal:', node.params.title, node.params.message);
+        if (window.showSignalPopup) {
+          window.showSignalPopup(node.params);
+        }
+        break;
+
     }
     
     // Continue the trigger chain to connected nodes
@@ -740,7 +719,7 @@ class NodeEditor {
   }
 
   startPeriodTrigger(node) {
-    if (node.type !== 'trigger-period' || !node.params.enabled) return;
+    if (node.type !== 'trigger') return;
     
     // Stop existing interval if any
     this.stopPeriodTrigger(node);
@@ -770,14 +749,31 @@ class NodeEditor {
 
   stopAllPeriodTriggers() {
     this.nodes.forEach(node => {
-      if (node.type === 'trigger-period') {
+      if (node.type === 'trigger') {
         this.stopPeriodTrigger(node);
       }
     });
   }
 
+  stopAllTriggers() {
+    // Stop all period triggers
+    this.stopAllPeriodTriggers();
+    
+    // Disable all manual triggers
+    this.nodes.forEach(node => {
+      if (node.type.startsWith('trigger-')) {
+        node.params.enabled = false;
+      }
+    });
+    
+    // Update properties panel if a trigger is selected
+    if (this.selectedNode && this.selectedNode.type.startsWith('trigger-')) {
+      window.updatePropertiesPanel(this.selectedNode);
+    }
+  }
+
   updatePeriodTrigger(node) {
-    if (node.type === 'trigger-period' && node.params.enabled) {
+    if (node.type === 'trigger' && node.intervalId) {
       this.startPeriodTrigger(node);
     } else {
       this.stopPeriodTrigger(node);

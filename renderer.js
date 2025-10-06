@@ -3,6 +3,8 @@ let isConnected = false;
 let nodeEditor = null;
 let symbolInput = null;
 let logEntries = [];
+let isStrategyRunning = false;
+let strategyStopRequested = false;
 
 // Override console methods to capture logs
 const originalConsole = {
@@ -79,6 +81,7 @@ function logMT5Response(action, response, requestData = null) {
 document.addEventListener('DOMContentLoaded', () => {
   initializeNodeEditor();
   setupEventListeners();
+  updateStrategyButtons(); // Set initial button state
   window.historyImport.checkBacktestMode();
 });
 
@@ -95,7 +98,20 @@ function setupEventListeners() {
   document.getElementById('tradeBtn').addEventListener('click', showTradeModal);
   document.getElementById('backtestBtn').addEventListener('click', () => window.historyImport.showBacktestModal());
   document.getElementById('showLogBtn').addEventListener('click', showLogModal);
-  document.getElementById('executeGraphBtn').addEventListener('click', executeNodeStrategy);
+  document.getElementById('runStrategyBtn').addEventListener('click', showRunStrategyModal);
+  document.getElementById('stopStrategyBtn').addEventListener('click', stopNodeStrategy);
+  
+  // Run strategy modal
+  document.getElementById('confirmRunBtn').addEventListener('click', handleRunStrategy);
+  document.getElementById('cancelRunBtn').addEventListener('click', hideRunStrategyModal);
+  
+  // Show/hide periodic settings based on selection
+  document.querySelectorAll('input[name="runOption"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const periodicSettings = document.getElementById('periodicSettings');
+      periodicSettings.style.display = e.target.value === 'periodic' ? 'block' : 'none';
+    });
+  });
   document.getElementById('saveGraphBtn').addEventListener('click', saveGraph);
   document.getElementById('loadGraphBtn').addEventListener('click', loadGraph);
   document.getElementById('clearGraphBtn').addEventListener('click', clearGraph);
@@ -123,6 +139,10 @@ function setupEventListeners() {
   document.getElementById('closeLogBtn').addEventListener('click', hideLogModal);
   document.getElementById('clearLogBtn').addEventListener('click', clearLog);
   document.getElementById('copyLogBtn').addEventListener('click', copyLog);
+  
+  // Stop strategy modal
+  document.getElementById('confirmStopBtn').addEventListener('click', handleStopStrategy);
+  document.getElementById('cancelStopBtn').addEventListener('click', hideStopStrategyModal);
   
   // Node palette buttons
   document.querySelectorAll('.node-btn').forEach(btn => {
@@ -562,9 +582,10 @@ function createModifyModal() {
 window.closePosition = closePosition;
 window.showModifyModal = showModifyModal;
 window.testVolumeLossFromNode = testVolumeLossFromNode;
+window.showSignalPopup = showSignalPopup;
 
-// Node Strategy Execution
-async function executeNodeStrategy() {
+// Show Run Strategy Modal
+function showRunStrategyModal() {
   if (!isConnected) {
     showMessage('Please connect to MT5 first', 'error');
     return;
@@ -577,24 +598,158 @@ async function executeNodeStrategy() {
     return;
   }
 
+  // Check if there are any trigger nodes
+  const hasTriggers = graph.nodes.some(node => node.type === 'trigger');
+  if (!hasTriggers) {
+    showMessage('Please add at least one Trigger node', 'error');
+    return;
+  }
+
+  // Reset modal to default state
+  document.getElementById('runOnce').checked = true;
+  document.getElementById('periodicSettings').style.display = 'none';
+  document.getElementById('periodicInterval').value = 60;
+  document.getElementById('periodicUnit').value = 'seconds';
+  
+  document.getElementById('runStrategyModal').classList.add('show');
+}
+
+// Hide Run Strategy Modal
+function hideRunStrategyModal() {
+  document.getElementById('runStrategyModal').classList.remove('show');
+}
+
+// Handle Run Strategy Confirmation
+async function handleRunStrategy() {
+  const runMode = document.querySelector('input[name="runOption"]:checked').value;
+  const interval = parseInt(document.getElementById('periodicInterval').value);
+  const unit = document.getElementById('periodicUnit').value;
+  
+  hideRunStrategyModal();
+
   // Check overtrade control for node-based strategies
-  const shouldProceed = await window.overtradeControl.checkBeforeTrade('node', { nodeCount: graph.nodes.length });
+  const shouldProceed = await window.overtradeControl.checkBeforeTrade('node', { nodeCount: nodeEditor.nodes.length });
   
   if (!shouldProceed) {
     showMessage('Node strategy execution cancelled', 'info');
     return;
   }
 
-  showMessage('Executing node-based strategy...', 'info');
+  try {
+    // Get all trigger nodes
+    const triggers = nodeEditor.nodes.filter(node => node.type === 'trigger');
+    
+    if (triggers.length === 0) {
+      showMessage('No trigger nodes found.', 'error');
+      return;
+    }
 
-  const result = await window.mt5API.executeNodeStrategy(graph);
+    if (runMode === 'once') {
+      // Execute all triggers once
+      showMessage('Executing strategy once...', 'info');
+      
+      triggers.forEach(node => {
+        nodeEditor.executeTrigger(node);
+      });
+      
+      showMessage(`Strategy executed: ${triggers.length} trigger(s) fired`, 'success');
+      
+    } else {
+      // Start periodic execution
+      isStrategyRunning = true;
+      strategyStopRequested = false;
+      updateStrategyButtons();
+      
+      showMessage('Starting periodic strategy execution...', 'info');
+      
+      // Set interval parameters for all triggers and start them
+      triggers.forEach(node => {
+        node.params.interval = interval;
+        node.params.unit = unit;
+        nodeEditor.startPeriodTrigger(node);
+      });
+      
+      showMessage(`Strategy running: ${triggers.length} trigger(s) executing every ${interval} ${unit}`, 'success');
+    }
 
-  if (result.success) {
-    showMessage(`Strategy executed! Processed ${result.data.executedNodes} nodes`, 'success');
-    handleRefreshAccount();
-    handleRefreshPositions();
+  } catch (error) {
+    showMessage('Strategy execution error: ' + error.message, 'error');
+    isStrategyRunning = false;
+    strategyStopRequested = false;
+    updateStrategyButtons();
+  }
+}
+
+// Stop Node Strategy
+function stopNodeStrategy() {
+  if (!isStrategyRunning) {
+    showMessage('No strategy is currently running', 'info');
+    return;
+  }
+
+  // Show stop strategy modal
+  showStopStrategyModal();
+}
+
+
+
+// Show stop strategy modal
+function showStopStrategyModal() {
+  document.getElementById('stopStrategyModal').classList.add('show');
+}
+
+// Hide stop strategy modal
+function hideStopStrategyModal() {
+  document.getElementById('stopStrategyModal').classList.remove('show');
+}
+
+// Handle stop strategy confirmation
+async function handleStopStrategy() {
+  hideStopStrategyModal();
+  strategyStopRequested = true;
+  
+  showMessage('Stopping strategy execution...', 'info');
+
+  // Stop any running period triggers
+  if (nodeEditor) {
+    nodeEditor.stopAllTriggers();
+  }
+
+  // Reset strategy state
+  isStrategyRunning = false;
+  strategyStopRequested = false;
+  updateStrategyButtons();
+  
+  showMessage('Strategy stopped successfully', 'success');
+}
+
+// Update strategy button visibility and status
+function updateStrategyButtons() {
+  const runBtn = document.getElementById('runStrategyBtn');
+  const stopBtn = document.getElementById('stopStrategyBtn');
+  const statusEl = document.getElementById('strategyStatus');
+  
+  if (isStrategyRunning) {
+    runBtn.style.display = 'none';
+    stopBtn.style.display = 'inline-block';
+    
+    if (strategyStopRequested) {
+      stopBtn.textContent = '⏹ Stopping...';
+      stopBtn.disabled = true;
+      statusEl.textContent = 'Stopping';
+      statusEl.className = 'status strategy-stopping';
+    } else {
+      stopBtn.textContent = '⏹ Stop Strategy';
+      stopBtn.disabled = false;
+      statusEl.textContent = 'Running';
+      statusEl.className = 'status strategy-running';
+    }
   } else {
-    showMessage('Strategy execution failed: ' + result.error, 'error');
+    runBtn.style.display = 'inline-block';
+    stopBtn.style.display = 'none';
+    stopBtn.disabled = false;
+    statusEl.textContent = 'Idle';
+    statusEl.className = 'status strategy-idle';
   }
 }
 
@@ -638,39 +793,7 @@ function updatePropertiesPanel(node) {
             <div id="nodeSymbolInput-${node.id}" class="node-symbol-input"></div>
           </div>
         `;
-      } else if (key === 'enabled' && node.type.startsWith('trigger-')) {
-        return `
-          <div class="property-item">
-            <label>${key}:</label>
-            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value === 'true')">
-              <option value="true" ${value ? 'selected' : ''}>Enabled</option>
-              <option value="false" ${!value ? 'selected' : ''}>Disabled</option>
-            </select>
-          </div>
-        `;
-      } else if (key === 'unit' && node.type === 'trigger-period') {
-        return `
-          <div class="property-item">
-            <label>${key}:</label>
-            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
-              <option value="seconds" ${value === 'seconds' ? 'selected' : ''}>Seconds</option>
-              <option value="minutes" ${value === 'minutes' ? 'selected' : ''}>Minutes</option>
-              <option value="hours" ${value === 'hours' ? 'selected' : ''}>Hours</option>
-            </select>
-          </div>
-        `;
-      } else if (key === 'interval' && node.type === 'trigger-period') {
-        return `
-          <div class="property-item">
-            <label>${key}:</label>
-            <input type="number" 
-                   value="${value}" 
-                   min="1"
-                   data-param="${key}"
-                   onchange="updateNodeParam('${key}', parseInt(this.value))">
-          </div>
-        `;
-      } else if (key === 'action' && (node.type === 'trade-signal' || node.type === 'trade-trailing')) {
+      } else if (key === 'action' && node.type === 'trade-signal') {
         return `
           <div class="property-item">
             <label>${key}:</label>
@@ -680,19 +803,7 @@ function updatePropertiesPanel(node) {
             </select>
           </div>
         `;
-      } else if ((key === 'trailDistance' || key === 'trailStep') && node.type === 'trade-trailing') {
-        return `
-          <div class="property-item">
-            <label>${key} (pips):</label>
-            <input type="number" 
-                   value="${value}" 
-                   min="1"
-                   step="1"
-                   data-param="${key}"
-                   onchange="updateNodeParam('${key}', parseInt(this.value))">
-          </div>
-        `;
-      } else if (key === 'volume' && (node.type === 'trade-signal' || node.type === 'trade-trailing')) {
+      } else if (key === 'volume' && node.type === 'trade-signal') {
         return `
           <div class="property-item">
             <label>${key}:</label>
@@ -729,6 +840,40 @@ function updatePropertiesPanel(node) {
                    onchange="updateNodeParam('${key}', parseFloat(this.value))">
           </div>
         `;
+      } else if (key === 'type' && node.type === 'signal-popup') {
+        return `
+          <div class="property-item">
+            <label>${key}:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
+              <option value="info" ${value === 'info' ? 'selected' : ''}>Info</option>
+              <option value="success" ${value === 'success' ? 'selected' : ''}>Success</option>
+              <option value="warning" ${value === 'warning' ? 'selected' : ''}>Warning</option>
+              <option value="error" ${value === 'error' ? 'selected' : ''}>Error</option>
+            </select>
+          </div>
+        `;
+      } else if (key === 'autoClose' && node.type === 'signal-popup') {
+        return `
+          <div class="property-item">
+            <label>${key}:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value === 'true')">
+              <option value="true" ${value ? 'selected' : ''}>Auto Close</option>
+              <option value="false" ${!value ? 'selected' : ''}>Manual Close</option>
+            </select>
+          </div>
+        `;
+      } else if (key === 'duration' && node.type === 'signal-popup') {
+        return `
+          <div class="property-item">
+            <label>${key} (ms):</label>
+            <input type="number" 
+                   value="${value}" 
+                   min="1000"
+                   step="1000"
+                   data-param="${key}"
+                   onchange="updateNodeParam('${key}', parseInt(this.value))">
+          </div>
+        `;
       } else {
         return `
           <div class="property-item">
@@ -757,10 +902,19 @@ function updatePropertiesPanel(node) {
   }
   
   // Add test loss button for trade nodes
-  if (node.type === 'trade-signal' || node.type === 'trade-trailing') {
+  if (node.type === 'trade-signal') {
     actionButtons += `
       <button class="btn btn-secondary btn-small" onclick="testVolumeLossFromNode('${node.id}')">
         Test Loss
+      </button>
+    `;
+  }
+  
+  // Add test popup button for signal nodes
+  if (node.type === 'signal-popup') {
+    actionButtons += `
+      <button class="btn btn-info btn-small" onclick="testSignalPopup('${node.id}')">
+        Test Popup
       </button>
     `;
   }
@@ -1356,6 +1510,22 @@ async function getCurrentPriceForNode(nodeId) {
 // Make function globally available
 window.getCurrentPriceForNode = getCurrentPriceForNode;
 
+// Test signal popup function
+function testSignalPopup(nodeId) {
+  const node = nodeEditor.nodes.find(n => n.id == nodeId);
+  if (!node || node.type !== 'signal-popup') {
+    showMessage('Please select a signal popup node first', 'error');
+    return;
+  }
+  
+  // Show the popup with the node's parameters
+  showSignalPopup(node.params);
+  showMessage('Testing signal popup with current parameters', 'info');
+}
+
+// Make function globally available
+window.testSignalPopup = testSignalPopup;
+
 // Log Modal Functions
 function showLogModal() {
   document.getElementById('logModal').classList.add('show');
@@ -1411,4 +1581,71 @@ function copyLog() {
   }).catch(() => {
     showMessage('Failed to copy log', 'error');
   });
+}
+
+// Signal Popup functionality
+function showSignalPopup(params) {
+  const { title, message, type, autoClose, duration } = params;
+  
+  // Create popup if it doesn't exist
+  let popup = document.getElementById('signalPopup');
+  if (!popup) {
+    createSignalPopup();
+    popup = document.getElementById('signalPopup');
+  }
+  
+  // Update popup content
+  document.getElementById('signalPopupTitle').textContent = title || 'Signal Alert';
+  document.getElementById('signalPopupMessage').textContent = message || 'Trading signal triggered!';
+  
+  // Set popup type styling
+  const popupContent = document.getElementById('signalPopupContent');
+  popupContent.className = `signal-popup-content ${type || 'info'}`;
+  
+  // Show popup
+  popup.style.display = 'block';
+  popup.classList.add('show');
+  
+  // Auto-close if enabled
+  if (autoClose !== false) {
+    const closeDelay = duration || 5000;
+    setTimeout(() => {
+      hideSignalPopup();
+    }, closeDelay);
+  }
+  
+  // Add to console log
+  console.log(`Signal Popup: ${title} - ${message}`);
+}
+
+function hideSignalPopup() {
+  const popup = document.getElementById('signalPopup');
+  if (popup) {
+    popup.classList.remove('show');
+    setTimeout(() => {
+      popup.style.display = 'none';
+    }, 300);
+  }
+}
+
+function createSignalPopup() {
+  const popupHTML = `
+    <div id="signalPopup" class="signal-popup" style="display: none;">
+      <div id="signalPopupContent" class="signal-popup-content info">
+        <div class="signal-popup-header">
+          <div class="signal-popup-icon">🔔</div>
+          <div class="signal-popup-title" id="signalPopupTitle">Signal Alert</div>
+          <button class="signal-popup-close" id="signalPopupClose">×</button>
+        </div>
+        <div class="signal-popup-body">
+          <div class="signal-popup-message" id="signalPopupMessage">Trading signal triggered!</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', popupHTML);
+  
+  // Add event listener for close button
+  document.getElementById('signalPopupClose').addEventListener('click', hideSignalPopup);
 }
