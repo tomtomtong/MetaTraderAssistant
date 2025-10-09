@@ -698,7 +698,6 @@ window.testVolumeLossFromNode = testVolumeLossFromNode;
 window.showSignalPopup = showSignalPopup;
 window.updatePriceFromPercent = updatePriceFromPercent;
 window.updatePercentFromPrice = updatePercentFromPrice;
-window.updateStrategyStatus = updateStrategyStatus;
 
 // Node editor percentage calculation functions
 function updateNodePriceFromPercent(priceKey, nodeId) {
@@ -922,7 +921,6 @@ async function handleStopStrategy() {
 function updateStrategyButtons() {
   const runBtn = document.getElementById('runStrategyBtn');
   const stopBtn = document.getElementById('stopStrategyBtn');
-  const statusEl = document.getElementById('strategyStatus');
   
   if (isStrategyRunning) {
     runBtn.style.display = 'none';
@@ -931,33 +929,19 @@ function updateStrategyButtons() {
     if (strategyStopRequested) {
       stopBtn.textContent = '⏹ Stopping...';
       stopBtn.disabled = true;
-      if (statusEl) {
-        statusEl.textContent = 'Stopping';
-        statusEl.className = 'status strategy-stopping';
-      }
     } else {
       stopBtn.textContent = '⏹ Stop Strategy';
       stopBtn.disabled = false;
-      if (statusEl) {
-        statusEl.textContent = 'Running';
-        statusEl.className = 'status strategy-running';
-      }
     }
   } else {
     runBtn.style.display = 'inline-block';
     stopBtn.style.display = 'none';
     stopBtn.disabled = false;
-    if (statusEl) {
-      statusEl.textContent = 'Idle';
-      statusEl.className = 'status strategy-idle';
-    }
   }
 }
 
 // Update strategy status (called by end-strategy node)
 function updateStrategyStatus(status) {
-  const statusEl = document.getElementById('strategyStatus');
-  
   if (status === 'stopped') {
     isStrategyRunning = false;
     strategyStopRequested = false;
@@ -968,19 +952,6 @@ function updateStrategyStatus(status) {
     }
     
     updateStrategyButtons();
-    
-    if (statusEl) {
-      statusEl.textContent = 'Completed';
-      statusEl.className = 'status strategy-completed';
-      
-      // Reset to idle after 3 seconds
-      setTimeout(() => {
-        if (statusEl.textContent === 'Completed') {
-          statusEl.textContent = 'Idle';
-          statusEl.className = 'status strategy-idle';
-        }
-      }, 3000);
-    }
   }
 }
 

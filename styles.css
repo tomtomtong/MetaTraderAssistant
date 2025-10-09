@@ -487,37 +487,7 @@ h4 {
   }
 }
 
-/* Strategy Status Indicator */
-.status.strategy-idle {
-  background: #757575;
-  color: white;
-}
 
-.status.strategy-running {
-  background: #4CAF50;
-  color: white;
-  animation: statusRunningPulse 2s infinite;
-}
-
-.status.strategy-stopping {
-  background: #FF9800;
-  color: white;
-  animation: statusStoppingBlink 1s infinite;
-}
-
-@keyframes statusRunningPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 rgba(76, 175, 80, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
-  }
-}
-
-@keyframes statusStoppingBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
 
 /* Modal */
 .modal {
@@ -2358,11 +2328,7 @@ l Popup Styles */
 
 .error-data {
   color: #f44336;
-}/* Strateg
-y Status */
-.status.strategy-idle {
-  background: #666;
-  color: white;
+}
 }
 
 .status.strategy-running {
