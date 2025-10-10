@@ -2655,14 +2655,19 @@ function addQuickSymbolFromInput(symbol) {
     return;
   }
   
+  // Preserve case for .cash suffix, uppercase everything else
+  const normalizedSymbol = symbol.endsWith('.cash') 
+    ? symbol.slice(0, -5).toUpperCase() + '.cash'
+    : symbol.toUpperCase();
+  
   const symbols = AppConfig.getQuickSymbols();
-  if (symbols.includes(symbol.toUpperCase())) {
+  if (symbols.includes(normalizedSymbol)) {
     showMessage('Symbol already exists', 'warning');
     return;
   }
   
-  // Add symbol in uppercase for consistency
-  AppConfig.addQuickSymbol(symbol.toUpperCase());
+  // Add symbol with proper case handling
+  AppConfig.addQuickSymbol(normalizedSymbol);
   
   // Clear the input
   if (window.settingsSymbolInput) {
@@ -2672,7 +2677,7 @@ function addQuickSymbolFromInput(symbol) {
   renderQuickSymbolsList();
   updateAllQuickSymbols();
   markSettingsAsChanged();
-  showMessage(`Added ${symbol.toUpperCase()} to quick symbols`, 'success');
+  showMessage(`Added ${normalizedSymbol} to quick symbols`, 'success');
 }
 
 function removeQuickSymbol(symbol) {
