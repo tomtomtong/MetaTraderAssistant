@@ -221,16 +221,7 @@ async function handleDisconnect() {
         // Reset connection state
         isConnected = false;
         
-        // Update connection status with null checks
-        try {
-          const connectionStatus = document.getElementById('connectionStatus');
-          if (connectionStatus) {
-            connectionStatus.textContent = 'Disconnected';
-            connectionStatus.className = 'status disconnected';
-          }
-        } catch (e) {
-          console.warn('Could not update connection status:', e);
-        }
+
         
         try {
           const connectBtn = document.getElementById('connectBtn');
@@ -751,8 +742,6 @@ async function handleConnect() {
 
   if (result.success) {
     isConnected = true;
-    document.getElementById('connectionStatus').textContent = 'Connected';
-    document.getElementById('connectionStatus').className = 'status connected';
     document.getElementById('connectBtn').textContent = 'Disconnect MT5';
     document.getElementById('connectBtn').className = 'btn btn-danger';
     showMessage('Connected to MT5 successfully!', 'success');
@@ -4061,14 +4050,12 @@ window.testConnectionToggle = function() {
   console.log('Current connection state:', isConnected);
   console.log('Button text:', document.getElementById('connectBtn').textContent);
   console.log('Button class:', document.getElementById('connectBtn').className);
-  console.log('Connection status:', document.getElementById('connectionStatus').textContent);
   console.log('=== END TEST ===');
   
   return {
     isConnected,
     buttonText: document.getElementById('connectBtn').textContent,
-    buttonClass: document.getElementById('connectBtn').className,
-    statusText: document.getElementById('connectionStatus').textContent
+    buttonClass: document.getElementById('connectBtn').className
   };
 };
 
