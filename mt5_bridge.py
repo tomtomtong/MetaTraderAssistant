@@ -585,14 +585,14 @@ class MT5Bridge:
             return {"error": str(e)}
     
     def get_closed_positions(self, days_back=7):
-        """Get closed positions (deal history) for the specified number of days"""
+        """Get closed positions (deal history) for the specified number of days (supports fractional days for hours)"""
         if not self.connected_to_mt5:
             return {"error": "Not connected to MT5"}
         
         try:
             from datetime import datetime, timedelta
             
-            # Calculate date range
+            # Calculate date range (supports fractional days for hours)
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days_back)
             
