@@ -247,6 +247,7 @@ Want to start fresh? **Settings → General → Simulator Mode → Reset Simulat
 - **Trade Nodes**: Open, close, and modify positions
 - **Twilio Alert**: Send SMS/WhatsApp notifications
 - **yFinance Data**: Fetch real-time stock data from Yahoo Finance (price, volume, company info, daily change)
+- **LLM Node**: AI-powered analysis using OpenRouter (supports GPT, Claude, Gemini, Llama models)
 - **Trigger Output**: Convert string data to trigger signals with customizable conditions
 - **String Input**: Provide custom text messages for alerts
 
@@ -319,6 +320,58 @@ MT5 Trader Alert
 - **WhatsApp**: ~$0.005 per message
 - **Free Trial**: Twilio provides free credits for testing
 - **Typical Usage**: 10-20 alerts per day = $0.05-$0.15 daily cost
+
+## 🤖 OpenRouter AI Integration
+
+### Prerequisites
+1. **OpenRouter Account**: Sign up at [openrouter.ai](https://openrouter.ai)
+2. **API Key**: Get your API key from OpenRouter dashboard
+3. **Credits**: Add credits to your OpenRouter account for API usage
+
+### Quick Setup
+
+1. **Configure in Application**:
+   - Open Settings → AI Analysis tab
+   - Enable OpenRouter
+   - Enter your OpenRouter API key (starts with `sk-or-v1-`)
+   - Select default model (GPT-4o Mini, Claude 3.5 Sonnet, etc.)
+   - Test configuration with "Test OpenRouter"
+   - Save settings
+
+2. **Using LLM Nodes**:
+   - Add LLM Node from node palette
+   - Configure prompt template (use `{input}` placeholder for dynamic data)
+   - Connect string input from other nodes (yFinance, String Input, etc.)
+   - Connect outputs to alerts or other nodes
+   - LLM node automatically uses your OpenRouter configuration
+
+### Supported Models
+- **OpenAI**: GPT-3.5 Turbo, GPT-4, GPT-4 Turbo, GPT-4o, GPT-4o Mini
+- **Anthropic**: Claude 3 Haiku, Claude 3 Sonnet, Claude 3.5 Sonnet
+- **Google**: Gemini Pro
+- **Meta**: Llama 3.1 8B, Llama 3.1 70B
+
+### Usage Examples
+
+#### Market Analysis with AI
+1. Add yFinance Data node → set symbol to "AAPL"
+2. Add LLM Node → set prompt: "Analyze this stock data and provide trading insight: {input}"
+3. Connect yFinance string output to LLM string input
+4. Add Twilio Alert → connect LLM string output to alert
+5. Result: AI analysis of Apple stock sent via SMS
+
+#### Price Alert with AI Commentary
+1. Add Conditional Check → monitor price conditions
+2. Add LLM Node → prompt: "The price condition was triggered. Provide market context: {input}"
+3. Connect conditional trigger to LLM trigger input
+4. Add String Input → connect to LLM for additional context
+5. Result: Smart alerts with AI-generated market commentary
+
+### Cost Considerations
+- **GPT-4o Mini**: ~$0.15 per 1M input tokens (most cost-effective)
+- **Claude 3.5 Sonnet**: ~$3 per 1M input tokens (high quality)
+- **Typical Usage**: 10-20 AI calls per day = $0.01-$0.10 daily cost
+- **Free Credits**: OpenRouter provides free credits for testing
 
 ## 👨‍💻 Developer Guide
 

@@ -1956,18 +1956,28 @@ function updatePropertiesPanel(node) {
         `;
 
       } else if (key === 'model' && node.type === 'llm-node') {
+        const openRouterSettings = window.settingsManager ? window.settingsManager.get('ai.openRouter') : null;
+        const defaultModel = openRouterSettings ? openRouterSettings.model : 'openai/gpt-4o-mini';
+        
         return `
           <div class="property-item">
             <label>LLM Model:</label>
             <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
-              <option value="gpt-3.5-turbo" ${value === 'gpt-3.5-turbo' ? 'selected' : ''}>GPT-3.5 Turbo</option>
-              <option value="gpt-4" ${value === 'gpt-4' ? 'selected' : ''}>GPT-4</option>
-              <option value="gpt-4-turbo" ${value === 'gpt-4-turbo' ? 'selected' : ''}>GPT-4 Turbo</option>
-              <option value="gpt-4o" ${value === 'gpt-4o' ? 'selected' : ''}>GPT-4o</option>
-              <option value="gpt-4o-mini" ${value === 'gpt-4o-mini' ? 'selected' : ''}>GPT-4o Mini</option>
+              <option value="" ${value === '' ? 'selected' : ''}>Use Settings Default (${defaultModel})</option>
+              <option value="openai/gpt-3.5-turbo" ${value === 'openai/gpt-3.5-turbo' ? 'selected' : ''}>OpenAI GPT-3.5 Turbo</option>
+              <option value="openai/gpt-4" ${value === 'openai/gpt-4' ? 'selected' : ''}>OpenAI GPT-4</option>
+              <option value="openai/gpt-4-turbo" ${value === 'openai/gpt-4-turbo' ? 'selected' : ''}>OpenAI GPT-4 Turbo</option>
+              <option value="openai/gpt-4o" ${value === 'openai/gpt-4o' ? 'selected' : ''}>OpenAI GPT-4o</option>
+              <option value="openai/gpt-4o-mini" ${value === 'openai/gpt-4o-mini' ? 'selected' : ''}>OpenAI GPT-4o Mini</option>
+              <option value="anthropic/claude-3-haiku" ${value === 'anthropic/claude-3-haiku' ? 'selected' : ''}>Anthropic Claude 3 Haiku</option>
+              <option value="anthropic/claude-3-sonnet" ${value === 'anthropic/claude-3-sonnet' ? 'selected' : ''}>Anthropic Claude 3 Sonnet</option>
+              <option value="anthropic/claude-3.5-sonnet" ${value === 'anthropic/claude-3.5-sonnet' ? 'selected' : ''}>Anthropic Claude 3.5 Sonnet</option>
+              <option value="google/gemini-pro" ${value === 'google/gemini-pro' ? 'selected' : ''}>Google Gemini Pro</option>
+              <option value="meta-llama/llama-3.1-8b-instruct" ${value === 'meta-llama/llama-3.1-8b-instruct' ? 'selected' : ''}>Meta Llama 3.1 8B</option>
+              <option value="meta-llama/llama-3.1-70b-instruct" ${value === 'meta-llama/llama-3.1-70b-instruct' ? 'selected' : ''}>Meta Llama 3.1 70B</option>
             </select>
             <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
-              Select the OpenAI model to use for LLM calls
+              Select a model or use the default from OpenRouter settings. Models are routed through OpenRouter.
             </small>
           </div>
         `;
@@ -2018,16 +2028,26 @@ function updatePropertiesPanel(node) {
           </div>
         `;
       } else if (key === 'apiKey' && node.type === 'llm-node') {
+        const openRouterSettings = window.settingsManager ? window.settingsManager.get('ai.openRouter') : null;
+        const isConfigured = openRouterSettings && openRouterSettings.enabled && openRouterSettings.apiKey;
+        
         return `
           <div class="property-item">
-            <label>API Key:</label>
-            <input type="password" 
-                   value="${value}" 
-                   data-param="${key}"
-                   placeholder="sk-..."
-                   onchange="updateNodeParam('${key}', this.value)">
-            <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
-              Your OpenAI API key (starts with sk-). Keep this secure!
+            <label>API Configuration:</label>
+            <div style="padding: 8px; background: ${isConfigured ? '#1a4d1a' : '#4d1a1a'}; border-radius: 4px; margin-bottom: 8px;">
+              <div style="color: ${isConfigured ? '#4ade80' : '#f87171'}; font-size: 12px; font-weight: bold;">
+                ${isConfigured ? '✓ OpenRouter Configured' : '✗ OpenRouter Not Configured'}
+              </div>
+              <div style="color: #888; font-size: 10px; margin-top: 4px;">
+                ${isConfigured 
+                  ? `Model: ${openRouterSettings.model || 'Default'} | API Key: ${openRouterSettings.apiKey.substring(0, 8)}...`
+                  : 'Configure OpenRouter in Settings to use LLM nodes'
+                }
+              </div>
+            </div>
+            <small style="color: #888; font-size: 10px;">
+              This node uses the global OpenRouter configuration from Settings.
+              ${!isConfigured ? 'Please enable and configure OpenRouter in the Settings panel.' : ''}
             </small>
           </div>
         `;

@@ -905,18 +905,18 @@ class MT5Bridge:
             logger.error(f"Error fetching yFinance data for {symbol}: {e}")
             return {"error": str(e)}
     
-    def call_llm(self, model='gpt-3.5-turbo', prompt='Hello', max_tokens=150, temperature=0.7, api_key=''):
+    def call_llm(self, model='gpt-3.5-turbo', prompt='Hello', max_tokens=150, temperature=0.7, api_key='', base_url='https://api.openai.com/v1'):
         """Call LLM API (OpenAI compatible) with the given prompt"""
         try:
-            logger.info(f"Calling LLM with model: {model}, prompt length: {len(prompt)}")
+            logger.info(f"Calling LLM with model: {model}, base_url: {base_url}, prompt length: {len(prompt)}")
             
             if not api_key:
                 return {"error": "API key is required for LLM calls"}
             
             import requests
             
-            # OpenAI API endpoint
-            url = "https://api.openai.com/v1/chat/completions"
+            # Use provided base URL or default to OpenAI
+            url = f"{base_url.rstrip('/')}/chat/completions"
             
             headers = {
                 "Authorization": f"Bearer {api_key}",
@@ -1156,7 +1156,8 @@ class MT5Bridge:
                 max_tokens = data.get('maxTokens', 150)
                 temperature = data.get('temperature', 0.7)
                 api_key = data.get('apiKey', '')
-                result = self.call_llm(model, prompt, max_tokens, temperature, api_key)
+                base_url = data.get('baseUrl', 'https://api.openai.com/v1')
+                result = self.call_llm(model, prompt, max_tokens, temperature, api_key, base_url)
                 response['data'] = result
             
             else:

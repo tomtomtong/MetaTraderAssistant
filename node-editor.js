@@ -346,11 +346,10 @@ class NodeEditor {
         inputs: ['trigger', 'string'],
         outputs: ['string', 'trigger'],
         params: { 
-          model: 'gpt-3.5-turbo',
+          model: '', // Will use model from OpenRouter settings if empty
           prompt: 'You are a helpful assistant. Respond to: {input}',
           maxTokens: 150,
           temperature: 0.7,
-          apiKey: '',
           useStringInput: true
         }
       },
@@ -1468,6 +1467,29 @@ class NodeEditor {
           console.log('Processing LLM node with model:', node.params.model);
           
           try {
+            // Get OpenRouter settings from global settings
+            const openRouterSettings = window.settingsManager ? window.settingsManager.get('ai.openRouter') : null;
+            
+            if (!openRouterSettings || !openRouterSettings.enabled) {
+              console.error('OpenRouter is not enabled in settings');
+              if (window.showMessage) {
+                window.showMessage('OpenRouter is not enabled. Please enable it in settings.', 'error');
+              }
+              node.llmResponse = 'Error: OpenRouter not enabled';
+              result = false;
+              break;
+            }
+            
+            if (!openRouterSettings.apiKey) {
+              console.error('OpenRouter API key not configured');
+              if (window.showMessage) {
+                window.showMessage('OpenRouter API key not configured. Please set it in settings.', 'error');
+              }
+              node.llmResponse = 'Error: API key not configured';
+              result = false;
+              break;
+            }
+            
             // Get input text from connected string input or use default
             let inputText = 'Hello';
             
@@ -1489,14 +1511,18 @@ class NodeEditor {
             const finalPrompt = node.params.prompt.replace('{input}', inputText);
             console.log('LLM prompt:', finalPrompt);
             
+            // Use model from node params or fallback to settings
+            const modelToUse = node.params.model || openRouterSettings.model;
+            
             // Call LLM API through MT5 bridge
             if (window.mt5API && window.mt5API.callLLM) {
               const llmResult = await window.mt5API.callLLM({
-                model: node.params.model,
+                model: modelToUse,
                 prompt: finalPrompt,
                 maxTokens: node.params.maxTokens,
                 temperature: node.params.temperature,
-                apiKey: node.params.apiKey
+                apiKey: openRouterSettings.apiKey,
+                baseUrl: openRouterSettings.baseUrl
               });
               
               if (llmResult.success && llmResult.data) {
