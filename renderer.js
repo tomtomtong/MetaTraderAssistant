@@ -246,9 +246,11 @@ function setupEventListeners() {
       const type = e.target.dataset.type;
       const canvas = document.getElementById('nodeCanvas');
       const rect = canvas.getBoundingClientRect();
-      const x = rect.width / 2 - 90 + Math.random() * 100;
-      const y = rect.height / 2 - 40 + Math.random() * 100;
-      nodeEditor.addNode(type, x, y);
+      const screenX = rect.width / 2 - 90 + Math.random() * 100;
+      const screenY = rect.height / 2 - 40 + Math.random() * 100;
+      // Convert screen coordinates to canvas coordinates
+      const canvasPos = nodeEditor.screenToCanvas(screenX, screenY);
+      nodeEditor.addNode(type, canvasPos.x, canvasPos.y);
     });
   });
   

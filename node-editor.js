@@ -13,6 +13,14 @@ class NodeEditor {
     this.mousePos = { x: 0, y: 0 };
     this.hoveredConnection = null;
     
+    // Canvas pan/zoom
+    this.panOffset = { x: 0, y: 0 };
+    this.isPanning = false;
+    this.isZoomDragging = false;
+    this.lastPanPos = { x: 0, y: 0 };
+    this.lastZoomY = 0;
+    this.spacePressed = false;
+    
     // Undo system for node deletion
     this.undoStack = [];
     this.maxUndoSteps = 20;
@@ -40,8 +48,10 @@ class NodeEditor {
     this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
     this.canvas.addEventListener('wheel', this.onWheel.bind(this));
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent right-click menu
     window.addEventListener('resize', () => this.setupCanvas());
     window.addEventListener('keydown', this.onKeyDown.bind(this));
+    window.addEventListener('keyup', this.onKeyUp.bind(this));
   }
 
   onMouseDown(e) {
@@ -51,15 +61,41 @@ class NodeEditor {
     }
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+
+    // Handle pan mode: Middle mouse button (button 1) or Right mouse button (button 2) or Space + Left click
+    if (e.button === 1 || e.button === 2 || (e.button === 0 && this.spacePressed)) {
+      this.isPanning = true;
+      this.lastPanPos = { x: e.clientX, y: e.clientY };
+      this.canvas.style.cursor = 'grab';
+      return;
+    }
+
+    // Handle zoom drag mode: Ctrl + Left mouse button
+    if (e.button === 0 && e.ctrlKey) {
+      this.isZoomDragging = true;
+      this.lastZoomY = e.clientY;
+      this.canvas.style.cursor = 'ns-resize';
+      return;
+    }
+
+    // Only proceed with normal interactions for left mouse button without modifiers
+    if (e.button !== 0 || this.spacePressed) {
+      return;
+    }
+
+    // Convert to canvas coordinates for node interactions
+    const canvasPos = this.screenToCanvas(screenX, screenY);
+    const x = canvasPos.x;
+    const y = canvasPos.y;
 
     // Check for output socket click FIRST (start connection) - higher priority than connection line
     for (let node of this.nodes) {
       for (let i = 0; i < node.outputs.length; i++) {
         const socket = this.getOutputSocketPos(node, i);
         const dist = Math.hypot(x - socket.x, y - socket.y);
-        if (dist < 8) {
+        if (dist < 8 / this.scale) { // Adjust click tolerance for zoom
           this.connectingFrom = { node: node, outputIndex: i };
           return;
         }
@@ -71,7 +107,7 @@ class NodeEditor {
       for (let i = 0; i < node.inputs.length; i++) {
         const socket = this.getInputSocketPos(node, i);
         const dist = Math.hypot(x - socket.x, y - socket.y);
-        if (dist < 8) {
+        if (dist < 8 / this.scale) { // Adjust click tolerance for zoom
           // Find existing connection to this input and start from its source
           const existingConn = this.connections.find(c => c.to === node && c.toInput === i);
           if (existingConn) {
@@ -108,23 +144,89 @@ class NodeEditor {
 
   onMouseMove(e) {
     const rect = this.canvas.getBoundingClientRect();
-    this.mousePos.x = e.clientX - rect.left;
-    this.mousePos.y = e.clientY - rect.top;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    
+    // Store screen coordinates for drawing connection lines
+    this.mousePos.x = screenX;
+    this.mousePos.y = screenY;
+
+    // Handle panning
+    if (this.isPanning) {
+      const dx = e.clientX - this.lastPanPos.x;
+      const dy = e.clientY - this.lastPanPos.y;
+      
+      this.panOffset.x += dx;
+      this.panOffset.y += dy;
+      
+      this.lastPanPos = { x: e.clientX, y: e.clientY };
+      this.canvas.style.cursor = 'grabbing';
+      return;
+    }
+
+    // Handle zoom dragging
+    if (this.isZoomDragging) {
+      const dy = this.lastZoomY - e.clientY; // Inverted: drag up = zoom in
+      const zoomFactor = 1 + (dy * 0.005); // Sensitivity factor
+      
+      const oldScale = this.scale;
+      this.scale *= zoomFactor;
+      this.scale = Math.max(0.1, Math.min(5, this.scale)); // Extended zoom range
+      
+      // Zoom towards center of canvas
+      const centerX = this.canvas.width / 2;
+      const centerY = this.canvas.height / 2;
+      const scaleChange = this.scale / oldScale - 1;
+      this.panOffset.x -= centerX * scaleChange;
+      this.panOffset.y -= centerY * scaleChange;
+      
+      this.lastZoomY = e.clientY;
+      return;
+    }
+
+    // Update cursor based on space key
+    if (this.spacePressed && !this.draggingNode && !this.connectingFrom) {
+      this.canvas.style.cursor = 'grab';
+    } else if (!this.draggingNode && !this.connectingFrom && !this.isPanning && !this.isZoomDragging) {
+      this.canvas.style.cursor = 'default';
+    }
+
+    // Convert to canvas coordinates for node interactions
+    const canvasPos = this.screenToCanvas(screenX, screenY);
 
     if (this.draggingNode && !this.isStrategyExecuting) {
-      this.draggingNode.x = this.mousePos.x - this.offset.x;
-      this.draggingNode.y = this.mousePos.y - this.offset.y;
+      this.draggingNode.x = canvasPos.x - this.offset.x;
+      this.draggingNode.y = canvasPos.y - this.offset.y;
     } else if (!this.isStrategyExecuting) {
-      // Check for connection line hover
-      this.hoveredConnection = this.getConnectionAtPoint(this.mousePos.x, this.mousePos.y);
+      // Check for connection line hover using canvas coordinates
+      this.hoveredConnection = this.getConnectionAtPoint(canvasPos.x, canvasPos.y);
     }
   }
 
   onMouseUp(e) {
+    // End panning
+    if (this.isPanning) {
+      this.isPanning = false;
+      this.canvas.style.cursor = this.spacePressed ? 'grab' : 'default';
+      return;
+    }
+
+    // End zoom dragging
+    if (this.isZoomDragging) {
+      this.isZoomDragging = false;
+      this.canvas.style.cursor = 'default';
+      return;
+    }
+
     if (this.connectingFrom) {
       const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      
+      // Convert to canvas coordinates
+      const canvasPos = this.screenToCanvas(screenX, screenY);
+      const x = canvasPos.x;
+      const y = canvasPos.y;
 
       // Check if released on an input socket
       for (let node of this.nodes) {
@@ -133,7 +235,7 @@ class NodeEditor {
         for (let i = 0; i < node.inputs.length; i++) {
           const socket = this.getInputSocketPos(node, i);
           const dist = Math.hypot(x - socket.x, y - socket.y);
-          if (dist < 8) {
+          if (dist < 8 / this.scale) { // Adjust click tolerance for zoom
             this.addConnection(this.connectingFrom.node, node, i, this.connectingFrom.outputIndex);
             break;
           }
@@ -148,11 +250,32 @@ class NodeEditor {
   onWheel(e) {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    
+    const oldScale = this.scale;
     this.scale *= delta;
-    this.scale = Math.max(0.5, Math.min(2, this.scale));
+    this.scale = Math.max(0.1, Math.min(5, this.scale)); // Extended zoom range
+    
+    // Zoom towards mouse position
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const scaleChange = this.scale / oldScale - 1;
+    this.panOffset.x -= mouseX * scaleChange;
+    this.panOffset.y -= mouseY * scaleChange;
   }
 
   onKeyDown(e) {
+    // Handle Space key for pan mode
+    if (e.code === 'Space' && !this.spacePressed) {
+      e.preventDefault();
+      this.spacePressed = true;
+      if (!this.isPanning && !this.isZoomDragging && !this.draggingNode && !this.connectingFrom) {
+        this.canvas.style.cursor = 'grab';
+      }
+      return;
+    }
+
     // Prevent keyboard actions during strategy execution
     if (this.isStrategyExecuting) {
       return;
@@ -170,6 +293,33 @@ class NodeEditor {
       e.preventDefault();
       this.undoLastDeletion();
     }
+  }
+
+  onKeyUp(e) {
+    // Handle Space key release
+    if (e.code === 'Space') {
+      e.preventDefault();
+      this.spacePressed = false;
+      if (!this.isPanning && !this.isZoomDragging) {
+        this.canvas.style.cursor = 'default';
+      }
+    }
+  }
+
+  // Convert screen coordinates to canvas coordinates (accounting for pan and zoom)
+  screenToCanvas(screenX, screenY) {
+    return {
+      x: (screenX - this.panOffset.x) / this.scale,
+      y: (screenY - this.panOffset.y) / this.scale
+    };
+  }
+
+  // Convert canvas coordinates to screen coordinates
+  canvasToScreen(canvasX, canvasY) {
+    return {
+      x: canvasX * this.scale + this.panOffset.x,
+      y: canvasY * this.scale + this.panOffset.y
+    };
   }
 
   deleteSelectedNode() {
@@ -597,16 +747,48 @@ class NodeEditor {
   }
 
   getInputSocketPos(node, index) {
+    // Always position trigger inputs at the top, then string inputs
+    const triggerInputs = node.inputs.filter(input => input === 'trigger');
+    const stringInputs = node.inputs.filter(input => input === 'string');
+    
+    let yOffset = 40; // Base offset from node top
+    
+    if (node.inputs[index] === 'trigger') {
+      // Position trigger inputs at the top
+      const triggerIndex = node.inputs.slice(0, index + 1).filter(input => input === 'trigger').length - 1;
+      yOffset += triggerIndex * 25;
+    } else {
+      // Position string inputs after trigger inputs
+      const stringIndex = node.inputs.slice(0, index + 1).filter(input => input === 'string').length - 1;
+      yOffset += triggerInputs.length * 25 + stringIndex * 25;
+    }
+    
     return {
       x: node.x,
-      y: node.y + 40 + index * 25
+      y: node.y + yOffset
     };
   }
 
   getOutputSocketPos(node, index = 0) {
+    // Always position trigger outputs at the top, then string outputs
+    const triggerOutputs = node.outputs.filter(output => output === 'trigger');
+    const stringOutputs = node.outputs.filter(output => output === 'string');
+    
+    let yOffset = 40; // Base offset from node top
+    
+    if (node.outputs[index] === 'trigger') {
+      // Position trigger outputs at the top
+      const triggerIndex = node.outputs.slice(0, index + 1).filter(output => output === 'trigger').length - 1;
+      yOffset += triggerIndex * 25;
+    } else {
+      // Position string outputs after trigger outputs
+      const stringIndex = node.outputs.slice(0, index + 1).filter(output => output === 'string').length - 1;
+      yOffset += triggerOutputs.length * 25 + stringIndex * 25;
+    }
+    
     return {
       x: node.x + node.width,
-      y: node.y + 40 + index * 25
+      y: node.y + yOffset
     };
   }
 
@@ -618,6 +800,13 @@ class NodeEditor {
   draw() {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Save context and apply transformations
+    ctx.save();
+    
+    // Apply pan and zoom transformations
+    ctx.translate(this.panOffset.x, this.panOffset.y);
+    ctx.scale(this.scale, this.scale);
 
     // Draw grid
     this.drawGrid();
@@ -668,10 +857,11 @@ class NodeEditor {
     // Draw connecting line
     if (this.connectingFrom) {
       const from = this.getOutputSocketPos(this.connectingFrom.node, this.connectingFrom.outputIndex);
+      const mouseCanvasPos = this.screenToCanvas(this.mousePos.x, this.mousePos.y);
       ctx.strokeStyle = '#FFA726';
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
-      ctx.lineTo(this.mousePos.x, this.mousePos.y);
+      ctx.lineTo(mouseCanvasPos.x, mouseCanvasPos.y);
       ctx.stroke();
     }
 
@@ -679,6 +869,9 @@ class NodeEditor {
     for (let node of this.nodes) {
       this.drawNode(node);
     }
+
+    // Restore context
+    ctx.restore();
   }
 
   drawGrid() {
