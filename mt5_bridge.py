@@ -434,7 +434,7 @@ class MT5Bridge:
             if 'twilio' not in current_config:
                 current_config['twilio'] = {}
             
-            # Update with new data (convert from old format to new format)
+            # Update npnmwith new data (convert from old format to new format)
             if 'twilio' in config_data:
                 twilio_data = config_data['twilio']
                 current_config['twilio'].update({
@@ -968,6 +968,124 @@ class MT5Bridge:
             logger.error(f"Error executing node strategy: {e}")
             return {"error": str(e)}
     
+    def firecrawl_scrape(self, url='', scrape_type='scrape', api_key='', base_url='https://api.firecrawl.dev/v0', 
+                        include_raw_html=False, only_main_content=False, max_pages=1, 
+                        wait_for='networkidle', timeout=30000, extractor_schema=None):
+        """Scrape web content using Firecrawl API"""
+        try:
+            logger.info(f"Firecrawling URL: {url}, type: {scrape_type}")
+            
+            if not api_key:
+                return {"error": "Firecrawl API key is required"}
+            
+            if not url:
+                return {"error": "URL is required for scraping"}
+            
+            import requests
+            
+            # Prepare headers
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # Prepare payload based on scrape type
+            if scrape_type == 'scrape':
+                payload = {
+                    "url": url,
+                    "formats": ["markdown"],
+                    "includeRawHtml": include_raw_html,
+                    "onlyMainContent": only_main_content,
+                    "waitFor": wait_for,
+                    "timeout": timeout
+                }
+                
+                if extractor_schema:
+                    payload["extractorOptions"] = {
+                        "mode": "llm-extraction",
+                        "extractionPrompt": extractor_schema.get("prompt", "Extract key information from this content"),
+                        "extractionSchema": extractor_schema.get("schema", {})
+                    }
+                
+                endpoint = f"{base_url.rstrip('/')}/scrape"
+                
+            elif scrape_type == 'crawl':
+                payload = {
+                    "url": url,
+                    "formats": ["markdown"],
+                    "includeRawHtml": include_raw_html,
+                    "onlyMainContent": only_main_content,
+                    "waitFor": wait_for,
+                    "timeout": timeout,
+                    "limit": max_pages
+                }
+                
+                if extractor_schema:
+                    payload["extractorOptions"] = {
+                        "mode": "llm-extraction",
+                        "extractionPrompt": extractor_schema.get("prompt", "Extract key information from this content"),
+                        "extractionSchema": extractor_schema.get("schema", {})
+                    }
+                
+                endpoint = f"{base_url.rstrip('/')}/crawl"
+                
+            else:
+                return {"error": f"Invalid scrape_type: {scrape_type}. Must be 'scrape' or 'crawl'"}
+            
+            logger.info(f"Sending request to Firecrawl API: {endpoint}")
+            response = requests.post(endpoint, json=payload, headers=headers, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"Firecrawl request successful for {url}")
+                
+                # Extract relevant data from response
+                if scrape_type == 'scrape':
+                    scraped_data = {
+                        "success": True,
+                        "url": url,
+                        "scrape_type": scrape_type,
+                        "content": result.get("data", {}).get("markdown", ""),
+                        "metadata": result.get("data", {}).get("metadata", {}),
+                        "raw_html": result.get("data", {}).get("html", "") if include_raw_html else None,
+                        "extracted_data": result.get("data", {}).get("llm_extraction", None) if extractor_schema else None
+                    }
+                else:  # crawl
+                    scraped_data = {
+                        "success": True,
+                        "url": url,
+                        "scrape_type": scrape_type,
+                        "pages": len(result.get("data", [])),
+                        "content": "\n\n--- PAGE BREAK ---\n\n".join([
+                            page.get("markdown", "") for page in result.get("data", [])
+                        ]),
+                        "metadata": [page.get("metadata", {}) for page in result.get("data", [])],
+                        "raw_html": [page.get("html", "") for page in result.get("data", [])] if include_raw_html else None,
+                        "extracted_data": [page.get("llm_extraction", None) for page in result.get("data", [])] if extractor_schema else None
+                    }
+                
+                return scraped_data
+                
+            else:
+                error_msg = f"Firecrawl API error: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                return {"error": error_msg}
+                
+        except requests.exceptions.Timeout:
+            error_msg = "Firecrawl request timed out"
+            logger.error(error_msg)
+            return {"error": error_msg}
+            
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Firecrawl request failed: {str(e)}"
+            logger.error(error_msg)
+            return {"error": error_msg}
+            
+        except Exception as e:
+            error_msg = f"Error in Firecrawl scraping: {str(e)}"
+            logger.error(error_msg)
+            return {"error": error_msg}
+    
     async def handle_message(self, websocket, message):
         """Handle incoming WebSocket messages from Electron"""
         try:
@@ -1131,6 +1249,22 @@ class MT5Bridge:
                 api_key = data.get('apiKey', '')
                 base_url = data.get('baseUrl', 'https://api.openai.com/v1')
                 result = self.call_llm(model, prompt, max_tokens, temperature, api_key, base_url)
+                response['data'] = result
+            
+            elif action == 'firecrawlScrape':
+                url = data.get('url', '')
+                scrape_type = data.get('scrapeType', 'scrape')
+                api_key = data.get('apiKey', '')
+                base_url = data.get('baseUrl', 'https://api.firecrawl.dev/v0')
+                include_raw_html = data.get('includeRawHtml', False)
+                only_main_content = data.get('onlyMainContent', False)
+                max_pages = data.get('maxPages', 1)
+                wait_for = data.get('waitFor', 'networkidle')
+                timeout = data.get('timeout', 30000)
+                extractor_schema = data.get('extractorSchema', None)
+                result = self.firecrawl_scrape(url, scrape_type, api_key, base_url, 
+                                            include_raw_html, only_main_content, max_pages,
+                                            wait_for, timeout, extractor_schema)
                 response['data'] = result
             
             else:

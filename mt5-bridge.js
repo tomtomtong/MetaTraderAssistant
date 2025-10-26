@@ -461,6 +461,16 @@ class MT5Bridge {
     return response.data;
   }
 
+  async firecrawlScrape(params) {
+    if (!this.connected) {
+      throw new Error('Not connected to MT5');
+    }
+
+    console.log(`Firecrawling URL: ${params.url}`);
+    const response = await this.sendMessage('firecrawlScrape', params);
+    return response.data;
+  }
+
   isConnected() {
     return this.connected;
   }

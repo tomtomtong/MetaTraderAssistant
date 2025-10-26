@@ -504,6 +504,25 @@ class NodeEditor {
         }
       },
 
+      'firecrawl-node': {
+        title: 'Firecrawl Scraper',
+        inputs: ['trigger', 'string'],
+        outputs: ['string', 'trigger'],
+        params: { 
+          url: 'https://example.com',
+          scrapeType: 'scrape',
+          apiKey: '', // Will use Firecrawl settings if empty
+          baseUrl: 'https://api.firecrawl.dev/v0',
+          includeRawHtml: false,
+          onlyMainContent: true,
+          maxPages: 1,
+          waitFor: 'networkidle',
+          timeout: 30000,
+          extractorPrompt: '',
+          useStringInput: false
+        }
+      },
+
       'string-output': {
         title: 'String Output',
         inputs: ['trigger', 'string'],
@@ -1705,6 +1724,136 @@ class NodeEditor {
           }
           break;
 
+        case 'firecrawl-node':
+          console.log('Processing Firecrawl node for URL:', node.params.url);
+          
+          try {
+            // Get Firecrawl settings from global settings
+            const firecrawlSettings = window.settingsManager ? window.settingsManager.get('ai.firecrawl') : null;
+            
+            if (!firecrawlSettings || !firecrawlSettings.enabled) {
+              console.error('Firecrawl is not enabled in settings');
+              if (window.showMessage) {
+                window.showMessage('Firecrawl is not enabled. Please enable it in settings.', 'error');
+              }
+              node.firecrawlData = 'Error: Firecrawl not enabled';
+              result = false;
+              break;
+            }
+            
+            if (!firecrawlSettings.apiKey) {
+              console.error('Firecrawl API key not configured');
+              if (window.showMessage) {
+                window.showMessage('Firecrawl API key not configured. Please set it in settings.', 'error');
+              }
+              node.firecrawlData = 'Error: API key not configured';
+              result = false;
+              break;
+            }
+            
+            // Get URL from node params or connected string input
+            let targetUrl = node.params.url;
+            
+            // Check if there's a string input connected (second input)
+            if (node.inputs.length > 1 && node.inputs[1] === 'string') {
+              const stringConnection = this.connections.find(c => c.to === node && c.toInput === 1);
+              if (stringConnection) {
+                if (stringConnection.from.type === 'string-input') {
+                  targetUrl = stringConnection.from.params.value || node.params.url;
+                  console.log('Using string input URL for Firecrawl:', targetUrl);
+                } else if (stringConnection.from.type === 'yfinance-data') {
+                  targetUrl = stringConnection.from.fetchedData || node.params.url;
+                  console.log('Using yfinance data URL for Firecrawl:', targetUrl);
+                }
+              }
+            }
+            
+            // Prepare extractor schema if prompt is provided
+            let extractorSchema = null;
+            if (node.params.extractorPrompt && node.params.extractorPrompt.trim()) {
+              extractorSchema = {
+                prompt: node.params.extractorPrompt,
+                schema: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string", description: "Page title" },
+                    summary: { type: "string", description: "Brief summary of content" },
+                    keyPoints: { type: "array", items: { type: "string" }, description: "Key points from the content" }
+                  }
+                }
+              };
+            }
+            
+            // Use API key from node params or fallback to settings
+            const apiKeyToUse = node.params.apiKey || firecrawlSettings.apiKey;
+            const baseUrlToUse = node.params.baseUrl || firecrawlSettings.baseUrl || 'https://api.firecrawl.dev/v0';
+            
+            // Call Firecrawl API through MT5 bridge
+            if (window.mt5API && window.mt5API.firecrawlScrape) {
+              const firecrawlResult = await window.mt5API.firecrawlScrape({
+                url: targetUrl,
+                scrapeType: node.params.scrapeType,
+                apiKey: apiKeyToUse,
+                baseUrl: baseUrlToUse,
+                includeRawHtml: node.params.includeRawHtml,
+                onlyMainContent: node.params.onlyMainContent,
+                maxPages: node.params.maxPages,
+                waitFor: node.params.waitFor,
+                timeout: node.params.timeout,
+                extractorSchema: extractorSchema
+              });
+              
+              if (firecrawlResult.success && firecrawlResult.data) {
+                console.log('✓ Firecrawl scraping successful for:', targetUrl);
+                
+                // Store the scraped content in the node for string output connections
+                let contentToStore = firecrawlResult.data.content || 'No content found';
+                
+                // Add metadata if available
+                if (firecrawlResult.data.metadata) {
+                  contentToStore = `Title: ${firecrawlResult.data.metadata.title || 'N/A'}\nURL: ${targetUrl}\n\n${contentToStore}`;
+                }
+                
+                // Add extracted data if available
+                if (firecrawlResult.data.extracted_data) {
+                  contentToStore += `\n\n--- EXTRACTED DATA ---\n${JSON.stringify(firecrawlResult.data.extracted_data, null, 2)}`;
+                }
+                
+                node.firecrawlData = contentToStore;
+                
+                if (window.showMessage) {
+                  const truncatedContent = contentToStore.length > 200 ? 
+                    contentToStore.substring(0, 200) + '...' : contentToStore;
+                  window.showMessage(`Firecrawl data: ${truncatedContent}`, 'success');
+                }
+                
+                result = true; // Continue trigger flow
+              } else {
+                console.error('✗ Firecrawl scraping failed:', firecrawlResult.error);
+                if (window.showMessage) {
+                  window.showMessage(`Firecrawl scraping failed: ${firecrawlResult.error}`, 'error');
+                }
+                node.firecrawlData = 'Error: ' + (firecrawlResult.error || 'Unknown error');
+                result = false; // Stop trigger flow on error
+              }
+            } else {
+              console.error('Firecrawl API not available');
+              if (window.showMessage) {
+                window.showMessage('Firecrawl API not available - check Python bridge', 'error');
+              }
+              node.firecrawlData = 'Error: API not available';
+              result = false; // Stop trigger flow on error
+            }
+          } catch (error) {
+            console.error('Error calling Firecrawl:', error);
+            if (window.showMessage) {
+              window.showMessage(`Firecrawl error: ${error.message}`, 'error');
+            }
+            node.firecrawlData = 'Error: ' + error.message;
+            result = false; // Stop trigger flow on error
+          }
+          break;
+
         case 'string-output':
           console.log('Processing String Output node');
           
@@ -1721,6 +1870,8 @@ class NodeEditor {
                 displayText = stringConnection.from.llmResponse || 'No LLM response';
               } else if (stringConnection.from.type === 'yfinance-data') {
                 displayText = stringConnection.from.fetchedData || 'No yfinance data';
+              } else if (stringConnection.from.type === 'firecrawl-node') {
+                displayText = stringConnection.from.firecrawlData || 'No Firecrawl data';
               } else {
                 // For other nodes, try to get a string representation
                 displayText = inputResult ? inputResult.toString() : 'No data';
@@ -1796,6 +1947,14 @@ class NodeEditor {
         if (fromOutput === 0) {
           // String output - pass the LLM response
           outputValue = node.llmResponse || 'No response';
+        } else if (fromOutput === 1) {
+          // Trigger output - pass the boolean result
+          outputValue = result;
+        }
+      } else if (node.type === 'firecrawl-node') {
+        if (fromOutput === 0) {
+          // String output - pass the Firecrawl data
+          outputValue = node.firecrawlData || 'No data';
         } else if (fromOutput === 1) {
           // Trigger output - pass the boolean result
           outputValue = result;
