@@ -1008,11 +1008,20 @@ async function confirmTradeExecution() {
   const tradeDataToExecute = { ...pendingTradeData };
   
   hideTradeConfirmationModal();
+  
+  // Check overtrade control again before executing (conditions may have changed)
+  const { symbol, type, volume, stopLoss, takeProfit } = tradeDataToExecute;
+  const tradeData = { symbol, type, volume, stopLoss, takeProfit, action: 'executeOrder' };
+  const shouldProceed = await window.overtradeControl.checkBeforeTrade('manual', tradeData);
+  
+  if (!shouldProceed) {
+    showMessage('Trade cancelled - overtrade limit reached', 'warning');
+    return;
+  }
+  
   showMessage('Executing trade...', 'info');
   
   try {
-    const { symbol, type, volume, stopLoss, takeProfit } = tradeDataToExecute;
-    
     const orderData = {
       symbol,
       type,
