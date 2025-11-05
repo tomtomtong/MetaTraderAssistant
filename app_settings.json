@@ -39,7 +39,9 @@
     "symbolLimits": {
       "XAUUSD": 0.01,
       "BTCUSD": 0.01,
-      "ETHUSD": 0.01
+      "ETHUSD": 0.01,
+      "HK50.CASH": 0.5,
+      "JP225.CASH": 0.5
     },
     "maxVolume": 1,
     "warningThreshold": 0.8,
@@ -55,7 +57,12 @@
     "applyToStrategy": true,
     "applyToNodes": true,
     "applyToOpenPositions": true,
-    "applyToClosePositions": false
+    "applyToClosePositions": false,
+    "maxTradesPerHour": 10,
+    "maxTradesPerDay": 50,
+    "cooldownMinutes": 5,
+    "warningEnabled": true,
+    "blockTrading": false
   },
   "overtradeHistory": [],
   "overtradeLastWarning": 0,

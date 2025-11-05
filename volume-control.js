@@ -4,7 +4,7 @@ class VolumeControl {
     this.settings = {
       enabled: true,
       symbolLimits: {}, // { "EURUSD": 0.5, "GBPUSD": 1.0, etc. }
-      maxVolume: 1.0,
+      maxVolume: 0.01,
       warningThreshold: 0.8,
       autoReduce: false,
       reductionFactor: 0.5

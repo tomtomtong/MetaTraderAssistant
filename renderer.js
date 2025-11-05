@@ -393,9 +393,11 @@ function showTradeModal() {
   document.getElementById('tradeModal').classList.add('show');
   
   // Update current price if symbol is already selected
-  const currentSymbol = symbolInput.getValue();
+  const currentSymbol = symbolInput ? symbolInput.getValue() : '';
   if (currentSymbol && currentSymbol.length >= 6) {
     updateCurrentPrice(currentSymbol);
+    // Also set default volume for already selected symbol
+    setDefaultVolumeForSymbol(currentSymbol);
   }
   
   // Note: Removed automatic volume loss calculation to prevent immediate popup
@@ -407,18 +409,63 @@ function hideTradeModal() {
   stopPriceAutoRefresh();
 }
 
+// Helper function to set default volume for a symbol
+function setDefaultVolumeForSymbol(symbol) {
+  if (!symbol || symbol.length < 6) return;
+  
+  // Ensure volumeControl is loaded
+  if (!window.volumeControl) {
+    // Retry after a short delay if volumeControl isn't ready yet
+    setTimeout(() => setDefaultVolumeForSymbol(symbol), 100);
+    return;
+  }
+  
+  // Load settings if not already loaded
+  if (!window.volumeControl.settingsLoaded) {
+    window.volumeControl.loadSettings();
+    // Retry after settings load
+    setTimeout(() => setDefaultVolumeForSymbol(symbol), 200);
+    return;
+  }
+  
+  // Get the volume input field
+  const volumeInput = document.getElementById('tradeVolume');
+  if (!volumeInput) {
+    // Volume input doesn't exist yet, retry after a short delay
+    setTimeout(() => setDefaultVolumeForSymbol(symbol), 100);
+    return;
+  }
+  
+  // Check if volume control is enabled
+  if (window.volumeControl.settings.enabled) {
+    const symbolUpper = symbol.toUpperCase();
+    const defaultVolume = window.volumeControl.settings.symbolLimits[symbolUpper];
+    if (defaultVolume) {
+      volumeInput.value = defaultVolume;
+      console.log(`Auto-populated volume for ${symbolUpper}: ${defaultVolume}`);
+    }
+  }
+}
+
 function initializeSymbolInput() {
   const container = document.getElementById('symbolInputContainer');
   symbolInput = new SymbolInput(container, {
     placeholder: 'Enter symbol (e.g., EURUSD)',
     onSymbolSelect: (symbol, symbolData) => {
       updateCurrentPrice(symbol);
+      
+      // Set default volume from volume limit configuration
+      setDefaultVolumeForSymbol(symbol);
     },
     onSymbolChange: (symbol) => {
       // Update market data display if needed
       if (symbol && symbol.length >= 6) {
         updateMarketDataPreview(symbol);
         updateCurrentPrice(symbol);
+        
+        // Set default volume from volume limit configuration
+        setDefaultVolumeForSymbol(symbol);
+        
         // Note: Removed automatic volume loss calculation to prevent immediate popup
         // Users can still calculate volume loss by changing volume or symbol values
       } else {
@@ -3961,10 +4008,10 @@ function updateVolumeLimitsList() {
       ${Object.entries(limits).map(([symbol, limit]) => `
         <div class="status-item volume-limit-item">
           <span class="label">${symbol}:</span>
-          <span class="value">${limit} max</span>
+          <span class="value">${limit} (default & max)</span>
           <div class="volume-limit-actions">
-            <button class="btn btn-warning btn-small" onclick="editVolumeLimit('${symbol}', ${limit})" title="Edit limit">✏️</button>
-            <button class="btn btn-danger btn-small" onclick="removeVolumeLimit('${symbol}')" title="Remove limit">🗑️</button>
+            <button class="btn btn-warning btn-small" onclick="editVolumeLimit('${symbol}', ${limit})" title="Edit volume">✏️</button>
+            <button class="btn btn-danger btn-small" onclick="removeVolumeLimit('${symbol}')" title="Remove volume">🗑️</button>
           </div>
         </div>
       `).join('')}
@@ -3987,7 +4034,7 @@ function addVolumeLimit() {
   }
   
   if (!limit || limit <= 0) {
-    showMessage('Please enter a valid volume limit', 'error');
+    showMessage('Please enter a valid volume', 'error');
     return;
   }
   
@@ -4001,51 +4048,51 @@ function addVolumeLimit() {
     }
     limitInput.value = '';
     
-    showMessage(`Volume limit set for ${symbol}: ${limit}`, 'success');
+    showMessage(`Default volume set for ${symbol}: ${limit} (also used as max limit)`, 'success');
     markSettingsAsChanged();
   } catch (error) {
-    showMessage('Error setting volume limit: ' + error.message, 'error');
+    showMessage('Error setting volume: ' + error.message, 'error');
   }
 }
 
 function editVolumeLimit(symbol, currentLimit) {
-  const newLimit = prompt(`Enter new volume limit for ${symbol}:`, currentLimit);
+  const newLimit = prompt(`Enter new default volume (and max limit) for ${symbol}:`, currentLimit);
   
   if (newLimit === null) return; // User cancelled
   
   const limit = parseFloat(newLimit);
   if (!limit || limit <= 0) {
-    showMessage('Invalid volume limit', 'error');
+    showMessage('Invalid volume', 'error');
     return;
   }
   
   try {
     window.volumeControl.setSymbolLimit(symbol, limit);
     updateVolumeLimitsList();
-    showMessage(`Volume limit updated for ${symbol}: ${limit}`, 'success');
+    showMessage(`Default volume updated for ${symbol}: ${limit} (also used as max limit)`, 'success');
     markSettingsAsChanged();
   } catch (error) {
-    showMessage('Error updating volume limit: ' + error.message, 'error');
+    showMessage('Error updating volume: ' + error.message, 'error');
   }
 }
 
 function removeVolumeLimit(symbol) {
   if (typeof showConfirmation === 'function') {
     showConfirmation(
-      'Remove Volume Limit',
-      `Are you sure you want to remove the volume limit for ${symbol}?`,
+      'Remove Volume Configuration',
+      `Are you sure you want to remove the default volume configuration for ${symbol}?`,
       () => {
         window.volumeControl.removeSymbolLimit(symbol);
         updateVolumeLimitsList();
-        showMessage(`Volume limit removed for ${symbol}`, 'info');
+        showMessage(`Volume configuration removed for ${symbol}`, 'info');
         markSettingsAsChanged();
       }
     );
   } else {
-    if (confirm(`Remove volume limit for ${symbol}?`)) {
+    if (confirm(`Remove volume configuration for ${symbol}?`)) {
       window.volumeControl.removeSymbolLimit(symbol);
       updateVolumeLimitsList();
-      showMessage(`Volume limit removed for ${symbol}`, 'info');
+      showMessage(`Volume configuration removed for ${symbol}`, 'info');
       markSettingsAsChanged();
     }
   }
