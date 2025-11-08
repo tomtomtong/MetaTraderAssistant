@@ -261,6 +261,8 @@ class NodePluginManager {
       return node.llmResponse || '';
     } else if (node.type === 'yfinance-data') {
       return node.fetchedData || '';
+    } else if (node.type === 'alphavantage-data') {
+      return node.fetchedData || '';
     } else if (node.type === 'firecrawl-node') {
       return node.firecrawlData || '';
     } else if (node.type === 'python-script') {

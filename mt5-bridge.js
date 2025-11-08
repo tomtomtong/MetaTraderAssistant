@@ -451,6 +451,16 @@ class MT5Bridge {
     return response.data;
   }
 
+  async getAlphaVantageData(params) {
+    if (!this.connected) {
+      throw new Error('Not connected to MT5');
+    }
+
+    console.log(`Getting Alpha Vantage data for: ${params.symbol}`);
+    const response = await this.sendMessage('getAlphaVantageData', params);
+    return response.data;
+  }
+
   async callLLM(params) {
     if (!this.connected) {
       throw new Error('Not connected to MT5');

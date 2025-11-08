@@ -33,6 +33,9 @@ class NodeEditor {
     this.currentExecutingNode = null;
     this.executingNodeStartTime = null;
 
+    // Simulator mode state
+    this.simulatorMode = false;
+
     this.setupCanvas();
     this.setupEventListeners();
     this.animate();
@@ -489,6 +492,19 @@ class NodeEditor {
         }
       },
 
+      'alphavantage-data': {
+        title: 'Alpha Vantage Data',
+        inputs: ['trigger'],
+        outputs: ['string', 'trigger'],
+        params: {
+          symbol: 'AAPL',
+          function: 'GLOBAL_QUOTE',
+          apiKey: '',
+          interval: '1min',
+          outputsize: 'compact'
+        }
+      },
+
 
 
       'llm-node': {
@@ -904,6 +920,54 @@ class NodeEditor {
 
     // Restore context
     ctx.restore();
+
+    // Draw simulator mode indicator
+    if (this.simulatorMode) {
+      this.drawSimulatorModeIndicator(ctx);
+    }
+  }
+
+  drawSimulatorModeIndicator(ctx) {
+    const padding = 15;
+    const fontSize = 16;
+    const text = 'Simulator Mode';
+    
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    
+    // Measure text for background
+    const metrics = ctx.measureText(text);
+    const textWidth = metrics.width;
+    const textHeight = fontSize;
+    const bgPadding = 10;
+    
+    // Draw background with rounded corners effect
+    const bgX = padding;
+    const bgY = padding;
+    const bgWidth = textWidth + bgPadding * 2;
+    const bgHeight = textHeight + bgPadding * 2;
+    
+    // Background
+    ctx.fillStyle = 'rgba(76, 175, 80, 0.9)';
+    ctx.beginPath();
+    ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 6);
+    ctx.fill();
+    
+    // Border
+    ctx.strokeStyle = '#4CAF50';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(bgX, bgY, bgWidth, bgHeight, 6);
+    ctx.stroke();
+    
+    // Text
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, bgX + bgPadding, bgY + bgPadding);
+  }
+
+  setSimulatorMode(enabled) {
+    this.simulatorMode = enabled;
   }
 
   drawGrid() {
@@ -1506,6 +1570,9 @@ class NodeEditor {
                 } else if (stringConnection.from.type === 'yfinance-data') {
                   // Get the fetched data from yfinance node
                   alertMessage = `${node.params.message}\n\n${stringConnection.from.params.symbol}: ${stringConnection.from.fetchedData || 'No data'}`;
+                } else if (stringConnection.from.type === 'alphavantage-data') {
+                  // Get the fetched data from Alpha Vantage node
+                  alertMessage = `${node.params.message}\n\n${stringConnection.from.params.symbol}: ${stringConnection.from.fetchedData || 'No data'}`;
                 }
               }
             }
@@ -1653,6 +1720,56 @@ class NodeEditor {
           }
           break;
 
+        case 'alphavantage-data':
+          console.log('Fetching Alpha Vantage data for:', node.params.symbol);
+
+          try {
+            if (window.mt5API && window.mt5API.getAlphaVantageData) {
+              const avResult = await window.mt5API.getAlphaVantageData({
+                symbol: node.params.symbol,
+                function: node.params.function,
+                apiKey: node.params.apiKey,
+                interval: node.params.interval,
+                outputsize: node.params.outputsize
+              });
+
+              if (avResult.success && avResult.data) {
+                console.log('✓ Alpha Vantage data fetched successfully:', avResult.data);
+
+                // Store the fetched data in the node for string output connections
+                node.fetchedData = avResult.data.value;
+
+                if (window.showMessage) {
+                  window.showMessage(`Alpha Vantage data: ${node.params.symbol} = ${node.fetchedData}`, 'success');
+                }
+
+                result = true; // Continue trigger flow
+              } else {
+                console.error('✗ Alpha Vantage data fetch failed:', avResult.error);
+                if (window.showMessage) {
+                  window.showMessage(`Alpha Vantage fetch failed: ${avResult.error}`, 'error');
+                }
+                node.fetchedData = 'Error fetching data';
+                result = false; // Stop trigger flow on error
+              }
+            } else {
+              console.error('Alpha Vantage API not available');
+              if (window.showMessage) {
+                window.showMessage('Alpha Vantage API not available - check Python bridge', 'error');
+              }
+              node.fetchedData = 'API not available';
+              result = false; // Stop trigger flow on error
+            }
+          } catch (error) {
+            console.error('Error fetching Alpha Vantage data:', error);
+            if (window.showMessage) {
+              window.showMessage(`Alpha Vantage error: ${error.message}`, 'error');
+            }
+            node.fetchedData = 'Error: ' + error.message;
+            result = false; // Stop trigger flow on error
+          }
+          break;
+
         case 'llm-node':
           console.log('Processing LLM node with model:', node.params.model);
 
@@ -1693,6 +1810,9 @@ class NodeEditor {
                 } else if (stringConnection.from.type === 'yfinance-data') {
                   inputText = stringConnection.from.fetchedData || 'No data';
                   console.log('Using yfinance data for LLM:', inputText);
+                } else if (stringConnection.from.type === 'alphavantage-data') {
+                  inputText = stringConnection.from.fetchedData || 'No data';
+                  console.log('Using Alpha Vantage data for LLM:', inputText);
                 }
               }
             }
@@ -1792,6 +1912,9 @@ class NodeEditor {
                 } else if (stringConnection.from.type === 'yfinance-data') {
                   targetUrl = stringConnection.from.fetchedData || node.params.url;
                   console.log('Using yfinance data URL for Firecrawl:', targetUrl);
+                } else if (stringConnection.from.type === 'alphavantage-data') {
+                  targetUrl = stringConnection.from.fetchedData || node.params.url;
+                  console.log('Using Alpha Vantage data URL for Firecrawl:', targetUrl);
                 }
               }
             }
@@ -1898,6 +2021,8 @@ class NodeEditor {
                 displayText = stringConnection.from.llmResponse || 'No LLM response';
               } else if (stringConnection.from.type === 'yfinance-data') {
                 displayText = stringConnection.from.fetchedData || 'No yfinance data';
+              } else if (stringConnection.from.type === 'alphavantage-data') {
+                displayText = stringConnection.from.fetchedData || 'No Alpha Vantage data';
               } else if (stringConnection.from.type === 'firecrawl-node') {
                 displayText = stringConnection.from.firecrawlData || 'No Firecrawl data';
               } else if (stringConnection.from.type === 'python-script') {
@@ -1951,6 +2076,8 @@ class NodeEditor {
               } else if (stringInputConn.from.type === 'llm-node') {
                 inputText = stringInputConn.from.llmResponse || '';
               } else if (stringInputConn.from.type === 'yfinance-data') {
+                inputText = stringInputConn.from.fetchedData || '';
+              } else if (stringInputConn.from.type === 'alphavantage-data') {
                 inputText = stringInputConn.from.fetchedData || '';
               } else if (stringInputConn.from.type === 'firecrawl-node') {
                 inputText = stringInputConn.from.firecrawlData || '';
@@ -2019,6 +2146,8 @@ class NodeEditor {
                 } else if (stringConnection.from.type === 'llm-node') {
                   inputData = stringConnection.from.llmResponse || '';
                 } else if (stringConnection.from.type === 'yfinance-data') {
+                  inputData = stringConnection.from.fetchedData || '';
+                } else if (stringConnection.from.type === 'alphavantage-data') {
                   inputData = stringConnection.from.fetchedData || '';
                 } else if (stringConnection.from.type === 'firecrawl-node') {
                   inputData = stringConnection.from.firecrawlData || '';
@@ -2109,6 +2238,14 @@ class NodeEditor {
           outputValue = result;
         }
       } else if (node.type === 'yfinance-data') {
+        if (fromOutput === 0) {
+          // String output - pass the fetched data
+          outputValue = node.fetchedData || 'No data';
+        } else if (fromOutput === 1) {
+          // Trigger output - pass the boolean result
+          outputValue = result;
+        }
+      } else if (node.type === 'alphavantage-data') {
         if (fromOutput === 0) {
           // String output - pass the fetched data
           outputValue = node.fetchedData || 'No data';

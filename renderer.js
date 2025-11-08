@@ -999,13 +999,21 @@ async function loadSimulatorSettings() {
           document.getElementById('simProfit').textContent = `$${status.account_summary.profit.toFixed(2)}`;
         }
         
-        // Show simulator indicator and enable light mode
+        // Show simulator indicator
         showSimulatorIndicator();
-        toggleLightMode(true);
+        
+        // Update canvas indicator
+        if (nodeEditor) {
+          nodeEditor.setSimulatorMode(true);
+        }
       } else {
         statusSection.style.display = 'none';
         hideSimulatorIndicator();
-        toggleLightMode(false);
+        
+        // Update canvas indicator
+        if (nodeEditor) {
+          nodeEditor.setSimulatorMode(false);
+        }
       }
     }
   } catch (error) {
@@ -1030,9 +1038,6 @@ async function toggleSimulatorMode(enabled) {
     if (result.success) {
       showMessage(result.data.message, 'success');
       await loadSimulatorSettings();
-      
-      // Toggle light mode theme with notification
-      toggleLightMode(enabled, true);
       
       // Refresh account and positions to show simulator data
       if (isConnected) {
@@ -2163,6 +2168,65 @@ function updatePropertiesPanel(node) {
             </select>
             <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
               Data interval for historical data
+            </small>
+          </div>
+        `;
+      } else if (key === 'function' && node.type === 'alphavantage-data') {
+        return `
+          <div class="property-item">
+            <label>Function:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
+              <option value="GLOBAL_QUOTE" ${value === 'GLOBAL_QUOTE' ? 'selected' : ''}>Global Quote</option>
+              <option value="TIME_SERIES_INTRADAY" ${value === 'TIME_SERIES_INTRADAY' ? 'selected' : ''}>Time Series Intraday</option>
+              <option value="TIME_SERIES_DAILY" ${value === 'TIME_SERIES_DAILY' ? 'selected' : ''}>Time Series Daily</option>
+              <option value="TIME_SERIES_WEEKLY" ${value === 'TIME_SERIES_WEEKLY' ? 'selected' : ''}>Time Series Weekly</option>
+              <option value="TIME_SERIES_MONTHLY" ${value === 'TIME_SERIES_MONTHLY' ? 'selected' : ''}>Time Series Monthly</option>
+              <option value="OVERVIEW" ${value === 'OVERVIEW' ? 'selected' : ''}>Company Overview</option>
+            </select>
+            <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
+              Select Alpha Vantage API function
+            </small>
+          </div>
+        `;
+      } else if (key === 'apiKey' && node.type === 'alphavantage-data') {
+        return `
+          <div class="property-item">
+            <label>API Key:</label>
+            <input type="text" data-param="${key}" value="${value || ''}" 
+                   onchange="updateNodeParam('${key}', this.value)" 
+                   placeholder="Enter Alpha Vantage API key"
+                   style="width: 100%; padding: 6px; border: 1px solid #444; background: #2d2d2d; color: #e0e0e0; border-radius: 4px;">
+            <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
+              Get your free API key from <a href="https://www.alphavantage.co/support/#api-key" target="_blank" style="color: #64B5F6;">alphavantage.co</a>
+            </small>
+          </div>
+        `;
+      } else if (key === 'interval' && node.type === 'alphavantage-data') {
+        return `
+          <div class="property-item">
+            <label>Interval:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
+              <option value="1min" ${value === '1min' ? 'selected' : ''}>1 Minute</option>
+              <option value="5min" ${value === '5min' ? 'selected' : ''}>5 Minutes</option>
+              <option value="15min" ${value === '15min' ? 'selected' : ''}>15 Minutes</option>
+              <option value="30min" ${value === '30min' ? 'selected' : ''}>30 Minutes</option>
+              <option value="60min" ${value === '60min' ? 'selected' : ''}>1 Hour</option>
+            </select>
+            <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
+              Data interval (for intraday functions only)
+            </small>
+          </div>
+        `;
+      } else if (key === 'outputsize' && node.type === 'alphavantage-data') {
+        return `
+          <div class="property-item">
+            <label>Output Size:</label>
+            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
+              <option value="compact" ${value === 'compact' ? 'selected' : ''}>Compact (100 data points)</option>
+              <option value="full" ${value === 'full' ? 'selected' : ''}>Full (up to 20 years)</option>
+            </select>
+            <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
+              Number of data points to return (for time series functions)
             </small>
           </div>
         `;

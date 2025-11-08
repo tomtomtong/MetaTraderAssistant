@@ -14,8 +14,8 @@
       "baseUrl": "https://openrouter.ai/api/v1"
     },
     "alphavantage": {
-      "enabled": false,
-      "apiKey": "",
+      "enabled": true,
+      "apiKey": "3TAP1GCIZ5EW1J63",
       "baseUrl": "https://www.alphavantage.co/query"
     },
     "features": {
@@ -66,11 +66,6 @@
   },
   "overtradeControl": {
     "enabled": true,
-    "maxTradesPerHour": 10,
-    "maxTradesPerDay": 50,
-    "cooldownMinutes": 5,
-    "warningEnabled": true,
-    "blockTrading": false,
     "maxTrades": 5,
     "timePeriod": "hour",
     "reminderFrequency": "first",
@@ -78,7 +73,12 @@
     "applyToStrategy": true,
     "applyToNodes": true,
     "applyToOpenPositions": true,
-    "applyToClosePositions": false
+    "applyToClosePositions": false,
+    "maxTradesPerHour": 10,
+    "maxTradesPerDay": 50,
+    "cooldownMinutes": 5,
+    "warningEnabled": true,
+    "blockTrading": false
   },
   "overtradeHistory": [],
   "overtradeLastWarning": 0,

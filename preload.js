@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('mt5API', {
   getSimulatorStatus: () => ipcRenderer.invoke('mt5:getSimulatorStatus'),
   resetSimulator: (initialBalance) => ipcRenderer.invoke('mt5:resetSimulator', initialBalance),
   getYFinanceData: (params) => ipcRenderer.invoke('mt5:getYFinanceData', params),
+  getAlphaVantageData: (params) => ipcRenderer.invoke('mt5:getAlphaVantageData', params),
   callLLM: (params) => ipcRenderer.invoke('mt5:callLLM', params),
   firecrawlScrape: (params) => ipcRenderer.invoke('mt5:firecrawlScrape', params),
   executePythonScript: (params) => ipcRenderer.invoke('mt5:executePythonScript', params)

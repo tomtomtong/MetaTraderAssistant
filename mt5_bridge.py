@@ -878,6 +878,144 @@ class MT5Bridge:
             logger.error(f"Error fetching yFinance data for {symbol}: {e}")
             return {"error": str(e)}
     
+    def get_alpha_vantage_data(self, symbol, function='GLOBAL_QUOTE', api_key='', interval='1min', outputsize='compact'):
+        """Get data from Alpha Vantage API for the specified symbol"""
+        try:
+            logger.info(f"Fetching Alpha Vantage data for {symbol}: function={function}, interval={interval}")
+            
+            if not api_key:
+                return {"error": "Alpha Vantage API key is required"}
+            
+            # Alpha Vantage API base URL
+            base_url = "https://www.alphavantage.co/query"
+            
+            # Build request parameters
+            params = {
+                'function': function,
+                'symbol': symbol,
+                'apikey': api_key
+            }
+            
+            # Add interval for intraday functions
+            if function in ['TIME_SERIES_INTRADAY', 'TIME_SERIES_INTRADAY_EXTENDED']:
+                params['interval'] = interval
+            
+            # Add outputsize for time series functions
+            if function.startswith('TIME_SERIES_'):
+                params['outputsize'] = outputsize
+            
+            # Make API request
+            response = requests.get(base_url, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Check for API errors
+            if 'Error Message' in data:
+                return {"error": data['Error Message']}
+            if 'Note' in data:
+                return {"error": "API call frequency limit reached. Please wait a moment."}
+            
+            # Parse response based on function type
+            if function == 'GLOBAL_QUOTE':
+                if 'Global Quote' not in data or not data['Global Quote']:
+                    return {"error": f"No quote data available for symbol {symbol}"}
+                
+                quote = data['Global Quote']
+                result_value = f"Price: {quote.get('05. price', 'N/A')}, " \
+                              f"Change: {quote.get('09. change', 'N/A')}, " \
+                              f"Change%: {quote.get('10. change percent', 'N/A')}, " \
+                              f"Volume: {quote.get('06. volume', 'N/A')}"
+                
+                return {
+                    "success": True,
+                    "symbol": symbol,
+                    "function": function,
+                    "value": result_value,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            elif function == 'TIME_SERIES_INTRADAY':
+                if 'Time Series' not in data or not data.get('Time Series'):
+                    return {"error": f"No intraday data available for symbol {symbol}"}
+                
+                time_series = data['Time Series']
+                # Get the most recent data point
+                latest_time = max(time_series.keys())
+                latest_data = time_series[latest_time]
+                
+                result_value = f"Time: {latest_time}, " \
+                              f"Open: {latest_data.get('1. open', 'N/A')}, " \
+                              f"High: {latest_data.get('2. high', 'N/A')}, " \
+                              f"Low: {latest_data.get('3. low', 'N/A')}, " \
+                              f"Close: {latest_data.get('4. close', 'N/A')}, " \
+                              f"Volume: {latest_data.get('5. volume', 'N/A')}"
+                
+                return {
+                    "success": True,
+                    "symbol": symbol,
+                    "function": function,
+                    "value": result_value,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            elif function == 'TIME_SERIES_DAILY':
+                if 'Time Series (Daily)' not in data or not data.get('Time Series (Daily)'):
+                    return {"error": f"No daily data available for symbol {symbol}"}
+                
+                time_series = data['Time Series (Daily)']
+                latest_date = max(time_series.keys())
+                latest_data = time_series[latest_date]
+                
+                result_value = f"Date: {latest_date}, " \
+                              f"Open: {latest_data.get('1. open', 'N/A')}, " \
+                              f"High: {latest_data.get('2. high', 'N/A')}, " \
+                              f"Low: {latest_data.get('3. low', 'N/A')}, " \
+                              f"Close: {latest_data.get('4. close', 'N/A')}, " \
+                              f"Volume: {latest_data.get('5. volume', 'N/A')}"
+                
+                return {
+                    "success": True,
+                    "symbol": symbol,
+                    "function": function,
+                    "value": result_value,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            elif function == 'OVERVIEW':
+                if 'Symbol' not in data:
+                    return {"error": f"No overview data available for symbol {symbol}"}
+                
+                result_value = f"Name: {data.get('Name', 'N/A')}, " \
+                              f"Sector: {data.get('Sector', 'N/A')}, " \
+                              f"Market Cap: {data.get('MarketCapitalization', 'N/A')}, " \
+                              f"PE Ratio: {data.get('PERatio', 'N/A')}, " \
+                              f"Dividend Yield: {data.get('DividendYield', 'N/A')}"
+                
+                return {
+                    "success": True,
+                    "symbol": symbol,
+                    "function": function,
+                    "value": result_value,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            else:
+                # For other functions, return JSON string
+                return {
+                    "success": True,
+                    "symbol": symbol,
+                    "function": function,
+                    "value": json.dumps(data, indent=2),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching Alpha Vantage data for {symbol}: {e}")
+            return {"error": f"API request failed: {str(e)}"}
+        except Exception as e:
+            logger.error(f"Error fetching Alpha Vantage data for {symbol}: {e}")
+            return {"error": str(e)}
+    
     def call_llm(self, model='gpt-3.5-turbo', prompt='Hello', max_tokens=150, temperature=0.7, api_key='', base_url='https://api.openai.com/v1'):
         """Call LLM API (OpenAI compatible) with the given prompt"""
         try:
@@ -1318,6 +1456,15 @@ class MT5Bridge:
                 period = data.get('period', '1d')
                 interval = data.get('interval', '1m')
                 result = self.get_yfinance_data(symbol, data_type, period, interval)
+                response['data'] = result
+            
+            elif action == 'getAlphaVantageData':
+                symbol = data.get('symbol')
+                function = data.get('function', 'GLOBAL_QUOTE')
+                api_key = data.get('apiKey', '')
+                interval = data.get('interval', '1min')
+                outputsize = data.get('outputsize', 'compact')
+                result = self.get_alpha_vantage_data(symbol, function, api_key, interval, outputsize)
                 response['data'] = result
             
             elif action == 'callLLM':
