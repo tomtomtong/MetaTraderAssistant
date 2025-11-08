@@ -13,6 +13,11 @@
       "model": "openai/gpt-4o-mini",
       "baseUrl": "https://openrouter.ai/api/v1"
     },
+    "alphavantage": {
+      "enabled": false,
+      "apiKey": "",
+      "baseUrl": "https://www.alphavantage.co/query"
+    },
     "features": {
       "marketAnalysis": true,
       "newsAnalysis": true,
@@ -21,12 +26,23 @@
     }
   },
   "twilio": {
-    "enabled": false,
+    "enabled": true,
     "accountSid": "",
     "authToken": "",
     "fromNumber": "",
     "recipientNumber": "",
     "method": "sms",
+    "alerts": {
+      "take_profit": true,
+      "stop_loss": true,
+      "position_opened": false,
+      "position_closed": false
+    }
+  },
+  "telegram": {
+    "enabled": true,
+    "botToken": "",
+    "chatId": "",
     "alerts": {
       "take_profit": true,
       "stop_loss": true,
@@ -50,6 +66,11 @@
   },
   "overtradeControl": {
     "enabled": true,
+    "maxTradesPerHour": 10,
+    "maxTradesPerDay": 50,
+    "cooldownMinutes": 5,
+    "warningEnabled": true,
+    "blockTrading": false,
     "maxTrades": 5,
     "timePeriod": "hour",
     "reminderFrequency": "first",
@@ -59,36 +80,7 @@
     "applyToOpenPositions": true,
     "applyToClosePositions": false
   },
-  "overtradeHistory": [
-    {
-      "timestamp": 1762557469937,
-      "type": "manual",
-      "data": {
-        "symbol": "XAUUSD",
-        "type": "BUY",
-        "volume": 0.01,
-        "stopLoss": 3879.8836,
-        "takeProfit": 4119.8764,
-        "action": "executeOrder"
-      },
-      "action": "executeOrder",
-      "positionType": "open"
-    },
-    {
-      "timestamp": 1762557512899,
-      "type": "manual",
-      "data": {
-        "symbol": "XAUUSD",
-        "type": "BUY",
-        "volume": 0.01,
-        "stopLoss": 3879.8836,
-        "takeProfit": 4119.8764,
-        "action": "executeOrder"
-      },
-      "action": "executeOrder",
-      "positionType": "open"
-    }
-  ],
+  "overtradeHistory": [],
   "overtradeLastWarning": 0,
   "overtradeWarningCount": 0,
   "ui": {
@@ -106,5 +98,19 @@
     "targetPrice": 105000,
     "volume": 0.01,
     "checkInterval": 5
+  },
+  "signal": {
+    "enabled": false,
+    "accountSid": "",
+    "authToken": "",
+    "fromNumber": "",
+    "recipientNumber": "",
+    "method": "sms",
+    "alerts": {
+      "take_profit": true,
+      "stop_loss": true,
+      "position_opened": false,
+      "position_closed": false
+    }
   }
 }

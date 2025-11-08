@@ -583,7 +583,7 @@
         <button class="settings-tab-btn active" data-tab="general">General</button>
 
         <button class="settings-tab-btn" data-tab="overtradeControl">Overtrade Control</button>
-        <button class="settings-tab-btn" data-tab="twilioAlerts">Twilio Alerts</button>
+        <button class="settings-tab-btn" data-tab="twilioAlerts">Notification</button>
         <button class="settings-tab-btn" data-tab="aiAnalysis">AI Analysis</button>
       </div>
       
@@ -754,16 +754,8 @@
         </div>
       </div>
       
-      <!-- Twilio Alerts Tab -->
+      <!-- Notification Tab -->
       <div id="twilioAlertsTab" class="settings-tab">
-        <div class="form-group">
-          <label>Enable Twilio Alerts:</label>
-          <select id="settingsTwilioEnabled">
-            <option value="false">Disabled</option>
-            <option value="true">Enabled</option>
-          </select>
-        </div>
-        
         <div class="twilio-config-section">
           <h4>🔑 Twilio Credentials</h4>
           <div class="twilio-grid">
@@ -813,25 +805,36 @@
           </div>
         </div>
         
+        <!-- Telegram Configuration -->
+        <div class="twilio-config-section">
+          <h4>🤖 Telegram Bot Configuration</h4>
+          <div class="twilio-grid">
+            <div class="form-group">
+              <label>Bot Token:</label>
+              <input type="password" id="settingsTelegramBotToken" placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
+              <small>From @BotFather on Telegram</small>
+            </div>
+            <div class="form-group">
+              <label>Chat ID:</label>
+              <input type="text" id="settingsTelegramChatId" placeholder="123456789">
+              <small>Your Telegram chat ID</small>
+            </div>
+          </div>
+        </div>
+        
         <div class="twilio-test-section">
           <h4>🧪 Test</h4>
           <div class="form-group">
-            <button id="testTwilioBtn" class="btn btn-info btn-small">Send Test Message</button>
+            <button id="testTwilioBtn" class="btn btn-info btn-small">Send Test Twilio</button>
+            <button id="testTelegramBtn" class="btn btn-info btn-small">Send Test Telegram</button>
             <div id="twilioTestResult" class="test-result"></div>
+            <div id="telegramTestResult" class="test-result"></div>
           </div>
         </div>
       </div>
       
       <!-- AI Analysis Tab -->
       <div id="aiAnalysisTab" class="settings-tab">
-        <div class="form-group">
-          <label>Enable AI Analysis:</label>
-          <select id="settingsAiEnabled">
-            <option value="false">Disabled</option>
-            <option value="true">Enabled</option>
-          </select>
-        </div>
-        
         <div class="twilio-config-section">
           <h4>🔥 Firecrawl Configuration</h4>
           <div class="twilio-grid">
@@ -902,11 +905,35 @@
           </div>
         </div>
         
+        <div class="notification-config-section">
+          <h4>📈 Alpha Vantage Configuration</h4>
+          <div class="twilio-grid">
+            <div class="form-group">
+              <label>API Key:</label>
+              <input type="password" id="settingsAlphaVantageApiKey" placeholder="Your Alpha Vantage API key">
+              <small>Your Alpha Vantage API key for market data</small>
+            </div>
+            <div class="form-group">
+              <label>Enable Alpha Vantage:</label>
+              <select id="settingsAlphaVantageEnabled">
+                <option value="false">Disabled</option>
+                <option value="true">Enabled</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Base URL:</label>
+            <input type="text" id="settingsAlphaVantageBaseUrl" placeholder="https://www.alphavantage.co/query" value="https://www.alphavantage.co/query">
+            <small>Alpha Vantage API endpoint</small>
+          </div>
+        </div>
+        
         <div class="twilio-test-section">
-          <h4>🧪 Test</h4>
+          <h4>🧪 Test Configurations</h4>
           <div class="form-group">
             <button id="testFirecrawlBtn" class="btn btn-info btn-small">Test Firecrawl</button>
             <button id="testOpenRouterBtn" class="btn btn-info btn-small">Test OpenRouter</button>
+            <button id="testAlphaVantageBtn" class="btn btn-info btn-small">Test Alpha Vantage</button>
             <div id="aiTestResult" class="test-result"></div>
           </div>
         </div>

@@ -20,6 +20,11 @@ class SettingsManager {
           model: 'anthropic/claude-3.5-sonnet',
           baseUrl: 'https://openrouter.ai/api/v1'
         },
+        alphavantage: {
+          enabled: false,
+          apiKey: '',
+          baseUrl: 'https://www.alphavantage.co/query'
+        },
         features: {
           marketAnalysis: true,
           newsAnalysis: true,
@@ -36,6 +41,19 @@ class SettingsManager {
         fromNumber: '',
         recipientNumber: '',
         method: 'sms',
+        alerts: {
+          take_profit: true,
+          stop_loss: true,
+          position_opened: false,
+          position_closed: false
+        }
+      },
+      
+      // Telegram settings
+      telegram: {
+        enabled: false,
+        botToken: '',
+        chatId: '',
         alerts: {
           take_profit: true,
           stop_loss: true,

@@ -102,7 +102,7 @@ async function loadAllSettingsOnStartup() {
       loadOvertradeSettings();
       loadVolumeControlSettings();
       loadTwilioSettings();
-      loadAiAnalysisSettings();
+      await loadAiAnalysisSettings();
       
       // Ensure control systems are properly initialized
       if (window.overtradeControl) {
@@ -3766,7 +3766,7 @@ async function showSettingsModal() {
   loadOvertradeSettings();
   loadVolumeControlSettings();
   loadTwilioSettings();
-  loadAiAnalysisSettings();
+  await loadAiAnalysisSettings();
   
   // Store original settings state for comparison
   storeOriginalSettingsState();
@@ -3805,8 +3805,10 @@ async function showSettingsModal() {
   document.getElementById('settingsTestOvertradeBtn').onclick = testOvertradeFromSettings;
   document.getElementById('addVolumeLimitBtn').onclick = addVolumeLimit;
   document.getElementById('testTwilioBtn').onclick = testTwilioConnection;
+  document.getElementById('testTelegramBtn').onclick = testTelegramConnection;
   document.getElementById('testFirecrawlBtn').onclick = testFirecrawlConnection;
   document.getElementById('testOpenRouterBtn').onclick = testOpenRouterConnection;
+  document.getElementById('testAlphaVantageBtn').onclick = testAlphaVantageConnection;
   
   // Simulator mode event listeners
   document.getElementById('settingsSimulatorMode').onchange = async (e) => {
@@ -4324,7 +4326,7 @@ async function loadSettingsFromFile(file) {
         loadOvertradeSettings();
         loadVolumeControlSettings();
         loadTwilioSettings();
-        loadAiAnalysisSettings();
+        await loadAiAnalysisSettings();
         
         console.log('✅ Settings loaded successfully from file:', file.name);
         showMessage('Settings loaded successfully', 'success');
@@ -5141,32 +5143,42 @@ window.testConnectionToggle = function() {
 // Twilio Settings Functions
 async function loadTwilioSettings() {
   try {
-    // Load from localStorage using AppConfig
-    const settings = AppConfig.getTwilioSettings();
+    if (!window.settingsManager) return;
     
-    // Update UI with current settings
-    document.getElementById('settingsTwilioEnabled').value = settings.enabled ? 'true' : 'false';
-    document.getElementById('settingsTwilioAccountSid').value = settings.accountSid || '';
-    document.getElementById('settingsTwilioAuthToken').value = settings.authToken || '';
-    document.getElementById('settingsTwilioFromNumber').value = settings.fromNumber || '';
-    document.getElementById('settingsRecipientNumber').value = settings.recipientNumber || '';
-    document.getElementById('settingsNotificationMethod').value = settings.method || 'sms';
+    // Load Twilio settings
+    const twilioSettings = window.settingsManager.get('twilio') || {};
+    // Notifications are always enabled - ensure setting is set to true
+    await window.settingsManager.set('twilio.enabled', true);
     
-    const alerts = settings.alerts || {};
-    document.getElementById('settingsAlertTakeProfit').checked = alerts.take_profit !== false;
-    document.getElementById('settingsAlertStopLoss').checked = alerts.stop_loss !== false;
-    document.getElementById('settingsAlertPositionOpened').checked = alerts.position_opened === true;
-    document.getElementById('settingsAlertPositionClosed').checked = alerts.position_closed === true;
+    document.getElementById('settingsTwilioAccountSid').value = twilioSettings.accountSid || '';
+    document.getElementById('settingsTwilioAuthToken').value = twilioSettings.authToken || '';
+    document.getElementById('settingsTwilioFromNumber').value = twilioSettings.fromNumber || '';
+    document.getElementById('settingsRecipientNumber').value = twilioSettings.recipientNumber || '';
+    document.getElementById('settingsNotificationMethod').value = twilioSettings.method || 'sms';
     
-    console.log('Twilio settings loaded from localStorage');
+    const twilioAlerts = twilioSettings.alerts || {};
+    document.getElementById('settingsAlertTakeProfit').checked = twilioAlerts.take_profit !== false;
+    document.getElementById('settingsAlertStopLoss').checked = twilioAlerts.stop_loss !== false;
+    document.getElementById('settingsAlertPositionOpened').checked = twilioAlerts.position_opened === true;
+    document.getElementById('settingsAlertPositionClosed').checked = twilioAlerts.position_closed === true;
+    
+    // Load Telegram settings
+    const telegramSettings = window.settingsManager.get('telegram') || {};
+    // Telegram is always enabled - ensure setting is set to true
+    await window.settingsManager.set('telegram.enabled', true);
+    
+    document.getElementById('settingsTelegramBotToken').value = telegramSettings.botToken || '';
+    document.getElementById('settingsTelegramChatId').value = telegramSettings.chatId || '';
+    
+    console.log('Twilio and Telegram settings loaded');
   } catch (error) {
-    console.error('Error loading Twilio settings:', error);
+    console.error('Error loading Twilio/Telegram settings:', error);
   }
 }
 
 function getCurrentTwilioSettings() {
   return {
-    enabled: document.getElementById('settingsTwilioEnabled').value === 'true',
+    enabled: true, // Notifications are always enabled
     accountSid: document.getElementById('settingsTwilioAccountSid').value,
     authToken: document.getElementById('settingsTwilioAuthToken').value,
     fromNumber: document.getElementById('settingsTwilioFromNumber').value,
@@ -5181,47 +5193,79 @@ function getCurrentTwilioSettings() {
   };
 }
 
+function getCurrentTelegramSettings() {
+  return {
+    enabled: true, // Telegram is always enabled
+    botToken: document.getElementById('settingsTelegramBotToken').value,
+    chatId: document.getElementById('settingsTelegramChatId').value,
+    alerts: {
+      take_profit: document.getElementById('settingsAlertTakeProfit').checked,
+      stop_loss: document.getElementById('settingsAlertStopLoss').checked,
+      position_opened: document.getElementById('settingsAlertPositionOpened').checked,
+      position_closed: document.getElementById('settingsAlertPositionClosed').checked
+    }
+  };
+}
+
 async function saveTwilioSettings() {
   try {
-    const settings = getCurrentTwilioSettings();
+    if (!window.settingsManager) return;
     
-    console.log('Saving Twilio settings:', {
-      accountSid: settings.accountSid ? '***' + settings.accountSid.slice(-4) : 'empty',
-      authToken: settings.authToken ? '***' : 'empty',
-      fromNumber: settings.fromNumber || 'empty',
-      recipientNumber: settings.recipientNumber || 'empty',
-      enabled: settings.enabled
+    const twilioSettings = getCurrentTwilioSettings();
+    const telegramSettings = getCurrentTelegramSettings();
+    
+    console.log('Saving Twilio and Telegram settings:', {
+      twilio: {
+        accountSid: twilioSettings.accountSid ? '***' + twilioSettings.accountSid.slice(-4) : 'empty',
+        enabled: twilioSettings.enabled
+      },
+      telegram: {
+        botToken: telegramSettings.botToken ? '***' : 'empty',
+        chatId: telegramSettings.chatId || 'empty',
+        enabled: telegramSettings.enabled
+      }
     });
     
-    // Save to localStorage using AppConfig
-    AppConfig.updateTwilioSettings(settings);
-    console.log('✓ Twilio settings saved to localStorage');
+    // Save to settings manager
+    await window.settingsManager.update({
+      'twilio': twilioSettings,
+      'telegram': telegramSettings
+    });
+    
+    console.log('✓ Twilio and Telegram settings saved');
     
     // Also send to backend for runtime use (if connected)
     if (isConnected && window.mt5API) {
       try {
         const configData = {
           twilio: {
-            account_sid: settings.accountSid,
-            auth_token: settings.authToken,
-            from_number: settings.fromNumber,
-            enabled: settings.enabled
+            account_sid: twilioSettings.accountSid,
+            auth_token: twilioSettings.authToken,
+            from_number: twilioSettings.fromNumber,
+            enabled: twilioSettings.enabled
+          },
+          telegram: {
+            bot_token: telegramSettings.botToken,
+            chat_id: telegramSettings.chatId,
+            enabled: telegramSettings.enabled
           },
           notifications: {
-            recipient_number: settings.recipientNumber,
-            method: settings.method,
-            alerts: settings.alerts
+            recipient_number: twilioSettings.recipientNumber,
+            method: twilioSettings.method,
+            alerts: twilioSettings.alerts
           }
         };
         
         console.log('Sending config to backend...');
-        const response = await window.mt5API.updateTwilioConfig(configData);
-        console.log('Backend response:', response);
-        
-        if (response && response.data && response.data.success) {
-          console.log('✓ Backend updated successfully');
-        } else {
-          console.warn('⚠ Backend update failed, but settings saved locally:', response?.data?.error || 'Unknown error');
+        if (window.mt5API.updateTwilioConfig) {
+          const response = await window.mt5API.updateTwilioConfig(configData);
+          console.log('Backend response:', response);
+          
+          if (response && response.data && response.data.success) {
+            console.log('✓ Backend updated successfully');
+          } else {
+            console.warn('⚠ Backend update failed, but settings saved locally:', response?.data?.error || 'Unknown error');
+          }
         }
       } catch (error) {
         console.warn('⚠ Could not update backend, but settings saved locally:', error.message);
@@ -5230,7 +5274,7 @@ async function saveTwilioSettings() {
     
     return true;
   } catch (error) {
-    console.error('✗ Error saving Twilio settings:', error);
+    console.error('✗ Error saving Twilio/Telegram settings:', error);
     return false;
   }
 }
@@ -5277,7 +5321,7 @@ async function testTwilioConnection() {
   } finally {
     // Re-enable button
     testBtn.disabled = false;
-    testBtn.textContent = 'Send Test Message';
+    testBtn.textContent = 'Send Test Twilio';
   }
 }
 
@@ -5293,13 +5337,75 @@ function showTwilioTestResult(type, message) {
   }, 5000);
 }
 
+async function testTelegramConnection() {
+  const testBtn = document.getElementById('testTelegramBtn');
+  const resultDiv = document.getElementById('telegramTestResult');
+  
+  // Disable button and show loading
+  testBtn.disabled = true;
+  testBtn.textContent = 'Sending...';
+  resultDiv.style.display = 'none';
+  
+  try {
+    const settings = getCurrentTelegramSettings();
+    
+    if (!settings.botToken || !settings.chatId) {
+      showTelegramTestResult('error', 'Please enter bot token and chat ID first');
+      return;
+    }
+    
+    // Save settings first to ensure they're applied
+    await saveTwilioSettings();
+    
+    // Send test message
+    if (window.mt5API && window.mt5API.sendTelegramAlert) {
+      const response = await window.mt5API.sendTelegramAlert({
+        message: 'Test message from MT5 Trader',
+        chatId: settings.chatId
+      });
+      
+      if (response && response.data) {
+        if (response.data.success) {
+          showTelegramTestResult('success', 'Test message sent successfully! Check your Telegram.');
+        } else {
+          showTelegramTestResult('error', `Failed to send test message: ${response.data.error}`);
+        }
+      } else {
+        showTelegramTestResult('error', 'No response from server');
+      }
+    } else {
+      showTelegramTestResult('info', 'Telegram test: Settings saved. Backend API integration pending.');
+    }
+  } catch (error) {
+    console.error('Error testing Telegram connection:', error);
+    showTelegramTestResult('error', `Error: ${error.message}`);
+  } finally {
+    // Re-enable button
+    testBtn.disabled = false;
+    testBtn.textContent = 'Send Test Telegram';
+  }
+}
+
+function showTelegramTestResult(type, message) {
+  const resultDiv = document.getElementById('telegramTestResult');
+  resultDiv.className = `test-result ${type}`;
+  resultDiv.textContent = message;
+  resultDiv.style.display = 'block';
+  
+  // Hide after 5 seconds
+  setTimeout(() => {
+    resultDiv.style.display = 'none';
+  }, 5000);
+}
+
 // Add Twilio settings to the change tracking
 function setupTwilioChangeTracking() {
   const twilioInputs = [
-    'settingsTwilioEnabled',
     'settingsTwilioAccountSid',
     'settingsTwilioAuthToken',
     'settingsTwilioFromNumber',
+    'settingsTelegramBotToken',
+    'settingsTelegramChatId',
     'settingsRecipientNumber',
     'settingsNotificationMethod',
     'settingsAlertTakeProfit',
@@ -5318,13 +5424,12 @@ function setupTwilioChangeTracking() {
 }
 
 // AI Analysis Settings Functions
-function loadAiAnalysisSettings() {
+async function loadAiAnalysisSettings() {
   try {
     if (!window.settingsManager) return;
     
-    // Load main AI enabled setting
-    const aiEnabled = window.settingsManager.get('ai.enabled') || false;
-    document.getElementById('settingsAiEnabled').value = aiEnabled ? 'true' : 'false';
+    // AI Analysis is always enabled - ensure setting is set to true
+    await window.settingsManager.set('ai.enabled', true);
     
     // Load Firecrawl settings
     const firecrawlEnabled = window.settingsManager.get('ai.firecrawl.enabled') || false;
@@ -5346,6 +5451,15 @@ function loadAiAnalysisSettings() {
     document.getElementById('settingsOpenRouterModel').value = openRouterModel;
     document.getElementById('settingsOpenRouterBaseUrl').value = openRouterBaseUrl;
     
+    // Load Alpha Vantage settings
+    const alphaVantageEnabled = window.settingsManager.get('ai.alphavantage.enabled') || false;
+    const alphaVantageApiKey = window.settingsManager.get('ai.alphavantage.apiKey') || '';
+    const alphaVantageBaseUrl = window.settingsManager.get('ai.alphavantage.baseUrl') || 'https://www.alphavantage.co/query';
+    
+    document.getElementById('settingsAlphaVantageEnabled').value = alphaVantageEnabled ? 'true' : 'false';
+    document.getElementById('settingsAlphaVantageApiKey').value = alphaVantageApiKey;
+    document.getElementById('settingsAlphaVantageBaseUrl').value = alphaVantageBaseUrl;
+    
     // Load AI feature settings
     const marketAnalysis = window.settingsManager.get('ai.features.marketAnalysis') !== false;
     const newsAnalysis = window.settingsManager.get('ai.features.newsAnalysis') !== false;
@@ -5366,8 +5480,8 @@ async function saveAiAnalysisSettings() {
   try {
     if (!window.settingsManager) return;
     
-    // Save main AI enabled setting
-    const aiEnabled = document.getElementById('settingsAiEnabled').value === 'true';
+    // AI Analysis is always enabled
+    const aiEnabled = true;
     
     // Save Firecrawl settings
     const firecrawlEnabled = document.getElementById('settingsFirecrawlEnabled').value === 'true';
@@ -5379,6 +5493,11 @@ async function saveAiAnalysisSettings() {
     const openRouterApiKey = document.getElementById('settingsOpenRouterApiKey').value;
     const openRouterModel = document.getElementById('settingsOpenRouterModel').value;
     const openRouterBaseUrl = document.getElementById('settingsOpenRouterBaseUrl').value;
+    
+    // Save Alpha Vantage settings
+    const alphaVantageEnabled = document.getElementById('settingsAlphaVantageEnabled').value === 'true';
+    const alphaVantageApiKey = document.getElementById('settingsAlphaVantageApiKey').value;
+    const alphaVantageBaseUrl = document.getElementById('settingsAlphaVantageBaseUrl').value;
     
     // Save AI feature settings
     const marketAnalysis = document.getElementById('settingsAiMarketAnalysis').checked;
@@ -5396,6 +5515,9 @@ async function saveAiAnalysisSettings() {
       'ai.openRouter.apiKey': openRouterApiKey,
       'ai.openRouter.model': openRouterModel,
       'ai.openRouter.baseUrl': openRouterBaseUrl,
+      'ai.alphavantage.enabled': alphaVantageEnabled,
+      'ai.alphavantage.apiKey': alphaVantageApiKey,
+      'ai.alphavantage.baseUrl': alphaVantageBaseUrl,
       'ai.features.marketAnalysis': marketAnalysis,
       'ai.features.newsAnalysis': newsAnalysis,
       'ai.features.strategyOptimization': strategyOptimization,
@@ -5501,6 +5623,50 @@ async function testOpenRouterConnection() {
   }
 }
 
+async function testAlphaVantageConnection() {
+  const testBtn = document.getElementById('testAlphaVantageBtn');
+  const resultDiv = document.getElementById('aiTestResult');
+  
+  testBtn.disabled = true;
+  testBtn.textContent = 'Testing...';
+  
+  try {
+    const apiKey = document.getElementById('settingsAlphaVantageApiKey').value;
+    const baseUrl = document.getElementById('settingsAlphaVantageBaseUrl').value;
+    
+    if (!apiKey) {
+      showAiTestResult('error', 'Please enter an Alpha Vantage API key');
+      return;
+    }
+    
+    // Test with a simple API call (TIME_SERIES_INTRADAY)
+    const testUrl = `${baseUrl}?function=TIME_SERIES_INTRADAY&symbol=IBM&interval=5min&apikey=${apiKey}`;
+    const response = await fetch(testUrl);
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data['Error Message']) {
+        showAiTestResult('error', `Alpha Vantage error: ${data['Error Message']}`);
+      } else if (data['Note']) {
+        showAiTestResult('warning', `Alpha Vantage note: ${data['Note']}`);
+      } else if (data['Meta Data']) {
+        showAiTestResult('success', 'Alpha Vantage connection successful!');
+      } else {
+        showAiTestResult('success', 'Alpha Vantage connection successful!');
+      }
+    } else {
+      const error = await response.text();
+      showAiTestResult('error', `Alpha Vantage test failed: ${response.status} - ${error}`);
+    }
+    
+  } catch (error) {
+    showAiTestResult('error', `Alpha Vantage connection error: ${error.message}`);
+  } finally {
+    testBtn.disabled = false;
+    testBtn.textContent = 'Test Alpha Vantage';
+  }
+}
+
 function showAiTestResult(type, message) {
   const resultDiv = document.getElementById('aiTestResult');
   resultDiv.className = `test-result ${type}`;
@@ -5516,7 +5682,6 @@ function showAiTestResult(type, message) {
 // Add AI settings to the change tracking
 function setupAiAnalysisChangeTracking() {
   const aiInputs = [
-    'settingsAiEnabled',
     'settingsFirecrawlEnabled',
     'settingsFirecrawlApiKey',
     'settingsFirecrawlBaseUrl',
@@ -5524,6 +5689,9 @@ function setupAiAnalysisChangeTracking() {
     'settingsOpenRouterApiKey',
     'settingsOpenRouterModel',
     'settingsOpenRouterBaseUrl',
+    'settingsAlphaVantageEnabled',
+    'settingsAlphaVantageApiKey',
+    'settingsAlphaVantageBaseUrl',
     'settingsAiMarketAnalysis',
     'settingsAiNewsAnalysis',
     'settingsAiStrategyOptimization',
