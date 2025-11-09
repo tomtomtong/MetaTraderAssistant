@@ -25,6 +25,9 @@ class NodeEditor {
     this.undoStack = [];
     this.maxUndoSteps = 20;
 
+    // Copy/paste system
+    this.copiedNode = null;
+
     // Track execution state for logic gates
     this.executionState = new Map(); // nodeId -> { inputResults: [], timestamp }
 
@@ -302,6 +305,24 @@ class NodeEditor {
       }
     }
 
+    // Ctrl+C for copy
+    if (e.ctrlKey && e.key === 'c') {
+      // Only copy if not in a text input field
+      if (!isTextInput && this.selectedNode) {
+        e.preventDefault();
+        this.copySelectedNode();
+      }
+    }
+
+    // Ctrl+V for paste
+    if (e.ctrlKey && e.key === 'v') {
+      // Only paste if not in a text input field
+      if (!isTextInput && this.copiedNode) {
+        e.preventDefault();
+        this.pasteNode();
+      }
+    }
+
     // Ctrl+Z for undo
     if (e.ctrlKey && e.key === 'z') {
       e.preventDefault();
@@ -359,6 +380,56 @@ class NodeEditor {
         window.updatePropertiesPanel(null);
       }
     }
+  }
+
+  copySelectedNode() {
+    if (this.selectedNode) {
+      // Create a deep copy of the selected node
+      this.copiedNode = {
+        type: this.selectedNode.type,
+        x: this.selectedNode.x,
+        y: this.selectedNode.y,
+        params: JSON.parse(JSON.stringify(this.selectedNode.params))
+      };
+      console.log('Node copied:', this.copiedNode.type);
+    }
+  }
+
+  pasteNode() {
+    if (!this.copiedNode) {
+      return;
+    }
+
+    // Calculate paste position near the center of the viewport
+    const centerScreenX = this.canvas.width / 2;
+    const centerScreenY = this.canvas.height / 2;
+    const centerCanvas = this.screenToCanvas(centerScreenX, centerScreenY);
+    
+    // Add a small random offset to avoid overlapping if pasting multiple times
+    const offsetX = (Math.random() - 0.5) * 100;
+    const offsetY = (Math.random() - 0.5) * 100;
+    const pasteX = centerCanvas.x + offsetX;
+    const pasteY = centerCanvas.y + offsetY;
+
+    // Create new node with copied properties
+    const newNode = this.addNode(this.copiedNode.type, pasteX, pasteY);
+    
+    // Copy parameters
+    newNode.params = JSON.parse(JSON.stringify(this.copiedNode.params));
+
+    // Select the newly pasted node
+    this.selectedNode = newNode;
+
+    // Update the copied node's position for next paste (so multiple pastes offset each time)
+    this.copiedNode.x = pasteX;
+    this.copiedNode.y = pasteY;
+
+    // Trigger property panel update
+    if (window.updatePropertiesPanel) {
+      window.updatePropertiesPanel(newNode);
+    }
+
+    console.log('Node pasted:', newNode.type);
   }
 
   addNode(type, x, y) {
@@ -474,7 +545,7 @@ class NodeEditor {
 
       'string-input': {
         title: 'String Input',
-        inputs: ['trigger'],
+        inputs: ['trigger', 'string'],
         outputs: ['string', 'trigger'],
         params: {
           value: 'Custom message text'
@@ -507,7 +578,7 @@ class NodeEditor {
 
       'yfinance-data': {
         title: 'yFinance Data',
-        inputs: ['trigger'],
+        inputs: ['trigger', 'string'],
         outputs: ['string', 'trigger'],
         params: {
           symbol: 'AAPL',
@@ -519,7 +590,7 @@ class NodeEditor {
 
       'alphavantage-data': {
         title: 'Alpha Vantage Data',
-        inputs: ['trigger'],
+        inputs: ['trigger', 'string'],
         outputs: ['string', 'trigger'],
         params: {
           symbol: 'AAPL',
@@ -1013,17 +1084,37 @@ class NodeEditor {
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1;
 
-    for (let x = 0; x < this.canvas.width; x += gridSize) {
+    // Calculate visible area in canvas coordinates (transformed space)
+    // Since transformations are already applied, we need to calculate
+    // what screen coordinates map to in the transformed space
+    // Screen coordinates: 0 to canvas.width, 0 to canvas.height
+    // Transform: translate(panOffset.x, panOffset.y), scale(scale, scale)
+    // To get transformed coords from screen: (screenX - panOffset.x) / scale
+    const minX = (0 - this.panOffset.x) / this.scale;
+    const maxX = (this.canvas.width - this.panOffset.x) / this.scale;
+    const minY = (0 - this.panOffset.y) / this.scale;
+    const maxY = (this.canvas.height - this.panOffset.y) / this.scale;
+
+    // Add padding to ensure grid covers entire visible area
+    const padding = gridSize * 2;
+    const startX = Math.floor((minX - padding) / gridSize) * gridSize;
+    const endX = Math.ceil((maxX + padding) / gridSize) * gridSize;
+    const startY = Math.floor((minY - padding) / gridSize) * gridSize;
+    const endY = Math.ceil((maxY + padding) / gridSize) * gridSize;
+
+    // Draw vertical grid lines
+    for (let x = startX; x <= endX; x += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.canvas.height);
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
       ctx.stroke();
     }
 
-    for (let y = 0; y < this.canvas.height; y += gridSize) {
+    // Draw horizontal grid lines
+    for (let y = startY; y <= endY; y += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(this.canvas.width, y);
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
       ctx.stroke();
     }
   }
@@ -1218,13 +1309,25 @@ class NodeEditor {
 
     let currentY = startY;
 
+    // Save the current canvas state and add clipping region
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(node.x + padding, node.y + 35, node.width - (padding * 2), node.height - 40);
+    ctx.clip();
+
     for (let [key, value] of params) {
       if (currentY + lineHeight > maxY) break; // Stop if we run out of space
 
-      // Truncate URL for display (for firecrawl-node)
+      // Truncate long text values for display
       let displayValue = value;
       if (key === 'url' && typeof value === 'string' && value.length > 40) {
         displayValue = value.substring(0, 37) + '...';
+      } else if (key === 'displayValue' && typeof value === 'string' && value.length > 80) {
+        // Truncate displayValue for string-output nodes
+        displayValue = value.substring(0, 77) + '...';
+      } else if (key === 'value' && typeof value === 'string' && value.length > 80) {
+        // Truncate value for string-input nodes
+        displayValue = value.substring(0, 77) + '...';
       }
 
       const paramText = `${key}: ${displayValue}`;
@@ -1238,6 +1341,9 @@ class NodeEditor {
         currentY += lineHeight;
       }
     }
+
+    // Restore the canvas state (remove clipping)
+    ctx.restore();
   }
 
   wrapText(ctx, text, maxWidth) {
@@ -1246,14 +1352,40 @@ class NodeEditor {
     let currentLine = '';
 
     for (let word of words) {
-      const testLine = currentLine + (currentLine ? ' ' : '') + word;
-      const metrics = ctx.measureText(testLine);
-
-      if (metrics.width > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
+      // Check if the word itself is too long
+      const wordMetrics = ctx.measureText(word);
+      
+      if (wordMetrics.width > maxWidth) {
+        // Push current line if it exists
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = '';
+        }
+        
+        // Break the long word character by character
+        let charLine = '';
+        for (let i = 0; i < word.length; i++) {
+          const testChar = charLine + word[i];
+          const charMetrics = ctx.measureText(testChar);
+          
+          if (charMetrics.width > maxWidth && charLine) {
+            lines.push(charLine);
+            charLine = word[i];
+          } else {
+            charLine = testChar;
+          }
+        }
+        currentLine = charLine; // Start new line with remaining characters
       } else {
-        currentLine = testLine;
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const metrics = ctx.measureText(testLine);
+
+        if (metrics.width > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
       }
     }
 
@@ -1425,8 +1557,44 @@ class NodeEditor {
       // Execute node-specific logic and get boolean result
       switch (node.type) {
         case 'string-input':
-          // Store the string value for string output connections
-          node.stringValue = node.params.value;
+          // Get string input from connected node if available
+          let stringInput = '';
+          if (node.inputs.length > 1 && node.inputs[1] === 'string') {
+            const stringConnection = this.connections.find(c => c.to === node && c.toInput === 1);
+            if (stringConnection) {
+              if (stringConnection.from.type === 'string-input') {
+                stringInput = stringConnection.from.stringValue || stringConnection.from.params.value || '';
+              } else if (stringConnection.from.type === 'string-output') {
+                stringInput = stringConnection.from.stringValue || stringConnection.from.params.displayValue || '';
+              } else if (stringConnection.from.type === 'yfinance-data') {
+                stringInput = stringConnection.from.fetchedData || '';
+              } else if (stringConnection.from.type === 'alphavantage-data') {
+                stringInput = stringConnection.from.fetchedData || '';
+              } else if (stringConnection.from.type === 'llm-node') {
+                stringInput = stringConnection.from.llmResponse || '';
+              } else if (stringConnection.from.type === 'firecrawl-node') {
+                stringInput = stringConnection.from.firecrawlData || '';
+              } else if (stringConnection.from.type === 'python-script') {
+                stringInput = stringConnection.from.pythonOutput || '';
+              }
+            }
+          }
+
+          // Combine input node value with string in properties and output it
+          const baseValue = node.params.value || '';
+          const inputValue = stringInput ? stringInput.trim() : '';
+          
+          // Combine both values: property string + input value
+          if (baseValue && inputValue) {
+            node.stringValue = baseValue + inputValue;
+          } else if (baseValue) {
+            node.stringValue = baseValue;
+          } else if (inputValue) {
+            node.stringValue = inputValue;
+          } else {
+            node.stringValue = '';
+          }
+
           result = true; // Continue trigger flow
           break;
 
@@ -1609,7 +1777,7 @@ class NodeEditor {
               if (stringConnection) {
                 if (stringConnection.from.type === 'string-input') {
                   // Get the string value from the connected string input node
-                  alertMessage = stringConnection.from.params.value || 'Custom message';
+                  alertMessage = stringConnection.from.stringValue || stringConnection.from.params.value || 'Custom message';
                 } else if (stringConnection.from.type === 'string-output') {
                   // Get the string value from the connected string output node
                   alertMessage = stringConnection.from.stringValue || stringConnection.from.params.displayValue || 'Custom message';
@@ -1721,6 +1889,29 @@ class NodeEditor {
           console.log('Fetching yFinance data for:', node.params.symbol);
 
           try {
+            // Get string input from connected node if available
+            let stringInput = '';
+            if (node.inputs.length > 1 && node.inputs[1] === 'string') {
+              const stringConnection = this.connections.find(c => c.to === node && c.toInput === 1);
+              if (stringConnection) {
+                if (stringConnection.from.type === 'string-input') {
+                  stringInput = stringConnection.from.stringValue || stringConnection.from.params.value || '';
+                } else if (stringConnection.from.type === 'string-output') {
+                  stringInput = stringConnection.from.stringValue || stringConnection.from.params.displayValue || '';
+                } else if (stringConnection.from.type === 'yfinance-data') {
+                  stringInput = stringConnection.from.fetchedData || '';
+                } else if (stringConnection.from.type === 'alphavantage-data') {
+                  stringInput = stringConnection.from.fetchedData || '';
+                } else if (stringConnection.from.type === 'llm-node') {
+                  stringInput = stringConnection.from.llmResponse || '';
+                } else if (stringConnection.from.type === 'firecrawl-node') {
+                  stringInput = stringConnection.from.firecrawlData || '';
+                } else if (stringConnection.from.type === 'python-script') {
+                  stringInput = stringConnection.from.pythonOutput || '';
+                }
+              }
+            }
+
             if (window.mt5API && window.mt5API.getYFinanceData) {
               const yfinanceResult = await window.mt5API.getYFinanceData({
                 symbol: node.params.symbol,
@@ -1732,8 +1923,13 @@ class NodeEditor {
               if (yfinanceResult.success && yfinanceResult.data) {
                 console.log('✓ yFinance data fetched successfully:', yfinanceResult.data);
 
-                // Store the fetched data in the node for string output connections
-                node.fetchedData = yfinanceResult.data.value;
+                // Concatenate string input with fetched data
+                const apiData = yfinanceResult.data.value;
+                if (stringInput && stringInput.trim()) {
+                  node.fetchedData = stringInput.trim() + apiData;
+                } else {
+                  node.fetchedData = apiData;
+                }
 
                 if (window.showMessage) {
                   window.showMessage(`yFinance data: ${node.params.symbol} = ${node.fetchedData}`, 'success');
@@ -1770,6 +1966,29 @@ class NodeEditor {
           console.log('Fetching Alpha Vantage data for:', node.params.symbol);
 
           try {
+            // Get string input from connected node if available
+            let stringInput = '';
+            if (node.inputs.length > 1 && node.inputs[1] === 'string') {
+              const stringConnection = this.connections.find(c => c.to === node && c.toInput === 1);
+              if (stringConnection) {
+                if (stringConnection.from.type === 'string-input') {
+                  stringInput = stringConnection.from.stringValue || stringConnection.from.params.value || '';
+                } else if (stringConnection.from.type === 'string-output') {
+                  stringInput = stringConnection.from.stringValue || stringConnection.from.params.displayValue || '';
+                } else if (stringConnection.from.type === 'yfinance-data') {
+                  stringInput = stringConnection.from.fetchedData || '';
+                } else if (stringConnection.from.type === 'alphavantage-data') {
+                  stringInput = stringConnection.from.fetchedData || '';
+                } else if (stringConnection.from.type === 'llm-node') {
+                  stringInput = stringConnection.from.llmResponse || '';
+                } else if (stringConnection.from.type === 'firecrawl-node') {
+                  stringInput = stringConnection.from.firecrawlData || '';
+                } else if (stringConnection.from.type === 'python-script') {
+                  stringInput = stringConnection.from.pythonOutput || '';
+                }
+              }
+            }
+
             // Get Alpha Vantage settings from global settings
             const alphaVantageSettings = window.settingsManager ? window.settingsManager.get('ai.alphavantage') : null;
 
@@ -1814,8 +2033,13 @@ class NodeEditor {
               if (avResult.success && avResult.data) {
                 console.log('✓ Alpha Vantage data fetched successfully:', avResult.data);
 
-                // Store the fetched data in the node for string output connections
-                node.fetchedData = avResult.data.value;
+                // Concatenate string input with fetched data
+                const apiData = avResult.data.value;
+                if (stringInput && stringInput.trim()) {
+                  node.fetchedData = stringInput.trim() + apiData;
+                } else {
+                  node.fetchedData = apiData;
+                }
 
                 if (window.showMessage) {
                   window.showMessage(`Alpha Vantage data: ${node.params.symbol} = ${node.fetchedData}`, 'success');
@@ -1890,7 +2114,7 @@ class NodeEditor {
               let stringValue = null;
               
               if (stringConnection.from.type === 'string-input') {
-                stringValue = stringConnection.from.params.value || '';
+                stringValue = stringConnection.from.stringValue || stringConnection.from.params.value || '';
               } else if (stringConnection.from.type === 'string-output') {
                 stringValue = stringConnection.from.stringValue || stringConnection.from.params.displayValue || '';
               } else if (stringConnection.from.type === 'yfinance-data') {
@@ -2022,7 +2246,7 @@ class NodeEditor {
               const stringConnection = this.connections.find(c => c.to === node && c.toInput === 1);
               if (stringConnection) {
                 if (stringConnection.from.type === 'string-input') {
-                  targetUrl = stringConnection.from.params.value || node.params.url;
+                  targetUrl = stringConnection.from.stringValue || stringConnection.from.params.value || node.params.url;
                   console.log('Using string input URL for Firecrawl:', targetUrl);
                 } else if (stringConnection.from.type === 'string-output') {
                   targetUrl = stringConnection.from.stringValue || stringConnection.from.params.displayValue || node.params.url;

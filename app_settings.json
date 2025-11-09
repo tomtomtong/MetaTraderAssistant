@@ -81,20 +81,10 @@
   },
   "overtradeHistory": [
     {
-      "timestamp": 1762677273675,
+      "timestamp": 1762679765822,
       "type": "node",
       "data": {
-        "nodeCount": 5,
-        "action": "executeNodeStrategy"
-      },
-      "action": "executeNodeStrategy",
-      "positionType": "open"
-    },
-    {
-      "timestamp": 1762677312895,
-      "type": "node",
-      "data": {
-        "nodeCount": 5,
+        "nodeCount": 6,
         "action": "executeNodeStrategy"
       },
       "action": "executeNodeStrategy",
