@@ -1724,11 +1724,38 @@ class NodeEditor {
           console.log('Fetching Alpha Vantage data for:', node.params.symbol);
 
           try {
+            // Get Alpha Vantage settings from global settings
+            const alphaVantageSettings = window.settingsManager ? window.settingsManager.get('ai.alphavantage') : null;
+
+            if (!alphaVantageSettings || !alphaVantageSettings.enabled) {
+              console.error('Alpha Vantage is not enabled in settings');
+              if (window.showMessage) {
+                window.showMessage('Alpha Vantage is not enabled. Please enable it in settings.', 'error');
+              }
+              node.fetchedData = 'Error: Alpha Vantage not enabled';
+              result = false;
+              break;
+            }
+
+            if (!alphaVantageSettings.apiKey) {
+              console.error('Alpha Vantage API key not configured');
+              if (window.showMessage) {
+                window.showMessage('Alpha Vantage API key not configured. Please set it in settings.', 'error');
+              }
+              node.fetchedData = 'Error: API key not configured';
+              result = false;
+              break;
+            }
+
+            // Use API key from node params or fallback to settings
+            const apiKeyToUse = node.params.apiKey || alphaVantageSettings.apiKey;
+            const baseUrlToUse = node.params.baseUrl || alphaVantageSettings.baseUrl || 'https://www.alphavantage.co/query';
+
             if (window.mt5API && window.mt5API.getAlphaVantageData) {
               const avResult = await window.mt5API.getAlphaVantageData({
                 symbol: node.params.symbol,
                 function: node.params.function,
-                apiKey: node.params.apiKey,
+                apiKey: apiKeyToUse,
                 interval: node.params.interval,
                 outputsize: node.params.outputsize
               });

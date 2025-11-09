@@ -80,7 +80,38 @@
     "warningEnabled": true,
     "blockTrading": false
   },
-  "overtradeHistory": [],
+  "overtradeHistory": [
+    {
+      "timestamp": 1762646093163,
+      "type": "node",
+      "data": {
+        "nodeCount": 3,
+        "action": "executeNodeStrategy"
+      },
+      "action": "executeNodeStrategy",
+      "positionType": "open"
+    },
+    {
+      "timestamp": 1762646472754,
+      "type": "node",
+      "data": {
+        "nodeCount": 3,
+        "action": "executeNodeStrategy"
+      },
+      "action": "executeNodeStrategy",
+      "positionType": "open"
+    },
+    {
+      "timestamp": 1762647160614,
+      "type": "node",
+      "data": {
+        "nodeCount": 3,
+        "action": "executeNodeStrategy"
+      },
+      "action": "executeNodeStrategy",
+      "positionType": "open"
+    }
+  ],
   "overtradeLastWarning": 0,
   "overtradeWarningCount": 0,
   "ui": {
