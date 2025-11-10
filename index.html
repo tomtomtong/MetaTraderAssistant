@@ -14,6 +14,7 @@
         <h1>MT5 Strategy Builder</h1>
         <button id="connectBtn" class="btn btn-primary">Connect MT5</button>
         <button id="showLogBtn" class="btn btn-secondary">Show Log</button>
+        <button id="showAIMemoryBtn" class="btn btn-secondary">🧠 AI Memory</button>
       </div>
       <div class="toolbar-right">
         <button id="tradeBtn" class="btn btn-success">New Trade</button>
@@ -326,6 +327,30 @@
         </div>
         <div class="modal-buttons">
           <button id="closeLogBtn" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Memory Modal -->
+    <div id="aiMemoryModal" class="modal">
+      <div class="modal-content log-modal">
+        <h2>🧠 AI Memory</h2>
+        <div class="log-controls">
+          <input 
+            type="text" 
+            id="aiMemoryFilter" 
+            placeholder="Filter by node name..." 
+            style="flex: 1; padding: 6px; margin-right: 8px; background: #1e1e1e; border: 1px solid #444; border-radius: 4px; color: #e0e0e0; font-size: 12px;"
+            oninput="filterAIMemory()"
+          />
+          <button id="refreshAIMemoryBtn" class="btn btn-secondary btn-small">🔄 Refresh</button>
+          <button id="clearAllAIMemoryBtn" class="btn btn-danger btn-small">Clear All</button>
+        </div>
+        <div id="aiMemoryContent" class="log-content">
+          <p class="no-log">No LLM nodes found or no memory entries yet.</p>
+        </div>
+        <div class="modal-buttons">
+          <button id="closeAIMemoryBtn" class="btn btn-primary">Close</button>
         </div>
       </div>
     </div>

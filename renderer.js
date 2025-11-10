@@ -196,6 +196,7 @@ function setupEventListeners() {
   document.getElementById('backtestBtn').addEventListener('click', () => window.historyImport.showBacktestModal());
   document.getElementById('settingsBtn').addEventListener('click', showSettingsModal);
   document.getElementById('showLogBtn').addEventListener('click', showLogModal);
+  document.getElementById('showAIMemoryBtn').addEventListener('click', showAIMemoryModal);
   document.getElementById('runStrategyBtn').addEventListener('click', showRunStrategyModal);
   document.getElementById('stopStrategyBtn').addEventListener('click', stopNodeStrategy);
   
@@ -258,6 +259,11 @@ function setupEventListeners() {
   document.getElementById('closeLogBtn').addEventListener('click', hideLogModal);
   document.getElementById('clearLogBtn').addEventListener('click', clearLog);
   document.getElementById('copyLogBtn').addEventListener('click', copyLog);
+  
+  // AI Memory Modal buttons
+  document.getElementById('closeAIMemoryBtn').addEventListener('click', hideAIMemoryModal);
+  document.getElementById('refreshAIMemoryBtn').addEventListener('click', updateAIMemoryDisplay);
+  document.getElementById('clearAllAIMemoryBtn').addEventListener('click', clearAllAIMemory);
   
   // Stop strategy modal
   document.getElementById('confirmStopBtn').addEventListener('click', handleStopStrategy);
@@ -1901,6 +1907,22 @@ function updatePropertiesPanel(node) {
       <label>Node Type:</label>
       <input type="text" value="${node.title}" disabled>
     </div>
+    ${node.type === 'llm-node' ? `
+      <div class="property-item">
+        <label>Node Name:</label>
+        <input 
+          type="text" 
+          value="${node.title || 'LLM Node'}" 
+          placeholder="Enter node name"
+          onchange="updateNodeName('${node.id}', this.value)"
+          onblur="updateNodeName('${node.id}', this.value)"
+          style="width: 100%; padding: 6px; margin-top: 4px;"
+        />
+        <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
+          Customize the display name for this LLM node
+        </small>
+      </div>
+    ` : ''}
     ${paramEntries.map(([key, value]) => {
       if (key === 'symbol') {
         return `
@@ -2348,22 +2370,41 @@ function updatePropertiesPanel(node) {
         return `
           <div class="property-item">
             <label>LLM Model:</label>
-            <select data-param="${key}" onchange="updateNodeParam('${key}', this.value)">
-              <option value="" ${value === '' ? 'selected' : ''}>Use Settings Default (${defaultModel})</option>
-              <option value="openai/gpt-3.5-turbo" ${value === 'openai/gpt-3.5-turbo' ? 'selected' : ''}>OpenAI GPT-3.5 Turbo</option>
-              <option value="openai/gpt-4" ${value === 'openai/gpt-4' ? 'selected' : ''}>OpenAI GPT-4</option>
-              <option value="openai/gpt-4-turbo" ${value === 'openai/gpt-4-turbo' ? 'selected' : ''}>OpenAI GPT-4 Turbo</option>
-              <option value="openai/gpt-4o" ${value === 'openai/gpt-4o' ? 'selected' : ''}>OpenAI GPT-4o</option>
-              <option value="openai/gpt-4o-mini" ${value === 'openai/gpt-4o-mini' ? 'selected' : ''}>OpenAI GPT-4o Mini</option>
-              <option value="anthropic/claude-3-haiku" ${value === 'anthropic/claude-3-haiku' ? 'selected' : ''}>Anthropic Claude 3 Haiku</option>
-              <option value="anthropic/claude-3-sonnet" ${value === 'anthropic/claude-3-sonnet' ? 'selected' : ''}>Anthropic Claude 3 Sonnet</option>
-              <option value="anthropic/claude-3.5-sonnet" ${value === 'anthropic/claude-3.5-sonnet' ? 'selected' : ''}>Anthropic Claude 3.5 Sonnet</option>
-              <option value="google/gemini-pro" ${value === 'google/gemini-pro' ? 'selected' : ''}>Google Gemini Pro</option>
-              <option value="meta-llama/llama-3.1-8b-instruct" ${value === 'meta-llama/llama-3.1-8b-instruct' ? 'selected' : ''}>Meta Llama 3.1 8B</option>
-              <option value="meta-llama/llama-3.1-70b-instruct" ${value === 'meta-llama/llama-3.1-70b-instruct' ? 'selected' : ''}>Meta Llama 3.1 70B</option>
-            </select>
+            <input 
+              type="text" 
+              data-param="${key}" 
+              value="${value || ''}" 
+              placeholder="Enter model name (e.g., openai/gpt-4o-mini)"
+              onchange="updateNodeParam('${key}', this.value)"
+              onblur="updateNodeParam('${key}', this.value)"
+              list="llm-model-suggestions-${node.id}"
+              style="width: 100%; padding: 6px; margin-top: 4px;"
+            />
+            <datalist id="llm-model-suggestions-${node.id}">
+              <option value="">Use Settings Default (${defaultModel})</option>
+              <option value="openai/gpt-3.5-turbo">OpenAI GPT-3.5 Turbo</option>
+              <option value="openai/gpt-4">OpenAI GPT-4</option>
+              <option value="openai/gpt-4-turbo">OpenAI GPT-4 Turbo</option>
+              <option value="openai/gpt-4o">OpenAI GPT-4o</option>
+              <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini</option>
+              <option value="openai/gpt-4o-2024-08-06">OpenAI GPT-4o (2024-08-06)</option>
+              <option value="openai/o1-preview">OpenAI O1 Preview</option>
+              <option value="openai/o1-mini">OpenAI O1 Mini</option>
+              <option value="anthropic/claude-3-haiku">Anthropic Claude 3 Haiku</option>
+              <option value="anthropic/claude-3-sonnet">Anthropic Claude 3 Sonnet</option>
+              <option value="anthropic/claude-3.5-sonnet">Anthropic Claude 3.5 Sonnet</option>
+              <option value="anthropic/claude-3-opus">Anthropic Claude 3 Opus</option>
+              <option value="google/gemini-pro">Google Gemini Pro</option>
+              <option value="google/gemini-pro-1.5">Google Gemini Pro 1.5</option>
+              <option value="meta-llama/llama-3.1-8b-instruct">Meta Llama 3.1 8B</option>
+              <option value="meta-llama/llama-3.1-70b-instruct">Meta Llama 3.1 70B</option>
+              <option value="mistralai/mistral-large">Mistral Large</option>
+              <option value="mistralai/mixtral-8x7b-instruct">Mistral Mixtral 8x7B</option>
+              <option value="perplexity/llama-3.1-sonar-large-128k-online">Perplexity Llama 3.1 Sonar Large</option>
+            </datalist>
             <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
-              Select a model or use the default from OpenRouter settings. Models are routed through OpenRouter.
+              Enter any OpenRouter model name (e.g., openai/gpt-4o-mini) or leave empty to use the default from OpenRouter settings (${defaultModel}).
+              <br>You can type to see suggestions or enter a custom model name.
             </small>
           </div>
         `;
@@ -2731,6 +2772,50 @@ function updatePropertiesPanel(node) {
   
 
   
+  // Add memory section for LLM nodes
+  if (node.type === 'llm-node') {
+    const memory = node.memory || [];
+    let memoryHtml = '';
+    
+    if (memory.length > 0) {
+      let memoryText = '';
+      const nodeName = node.title || 'LLM Node';
+      
+      // Display memory entries in reverse order (newest first)
+      memory.slice().reverse().forEach((entry) => {
+        const date = new Date(entry.timestamp);
+        const formattedDate = date.toLocaleString();
+        const relativeTime = getRelativeTime(entry.timestamp);
+        const outputText = entry.output || '';
+        
+        memoryText += `[${nodeName}] [${formattedDate}] [${relativeTime}]\n`;
+        memoryText += `${outputText}\n`;
+        memoryText += `\n${'='.repeat(60)}\n\n`;
+      });
+      
+      memoryHtml = `
+        <div class="property-item" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+          <label style="color: #4CAF50; font-weight: bold; margin-bottom: 10px; display: block;">🧠 Memory (${memory.length} ${memory.length === 1 ? 'entry' : 'entries'}):</label>
+          <div style="max-height: 300px; overflow-y: auto; background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 10px;">
+            <pre style="color: #e0e0e0; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; margin: 0;">${escapeHtml(memoryText.trim())}</pre>
+          </div>
+          <button class="btn btn-secondary btn-small" onclick="clearNodeMemory('${node.id}')" style="margin-top: 8px;">
+            Clear Memory
+          </button>
+        </div>
+      `;
+    } else {
+      memoryHtml = `
+        <div class="property-item" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+          <label style="color: #888; font-weight: bold; margin-bottom: 10px; display: block;">🧠 Memory:</label>
+          <p style="color: #888; font-size: 12px; margin: 0;">No memory entries yet. Execute this LLM node to see outputs.</p>
+        </div>
+      `;
+    }
+    
+    panel.innerHTML += memoryHtml;
+  }
+  
   // Add delete button for all nodes
   actionButtons += `
     <button class="btn btn-danger btn-small" onclick="deleteSelectedNode()">
@@ -2828,6 +2913,31 @@ window.onStrategyExecutionStateChanged = function(isExecuting) {
       }
     }
   });
+};
+
+// Update node name/title
+window.updateNodeName = function(nodeId, newName) {
+  if (!nodeEditor || !nodeEditor.nodes) {
+    return;
+  }
+  
+  const node = nodeEditor.nodes.find(n => n.id == nodeId || String(n.id) === String(nodeId));
+  if (!node) {
+    return;
+  }
+  
+  // Update the node title
+  node.title = newName || node.title || 'LLM Node';
+  
+  // Refresh the properties panel if this node is selected
+  if (nodeEditor.selectedNode && (nodeEditor.selectedNode.id == nodeId || String(nodeEditor.selectedNode.id) === String(nodeId))) {
+    updatePropertiesPanel(nodeEditor.selectedNode);
+  }
+  
+  // Redraw the canvas to show the updated name
+  if (nodeEditor.draw) {
+    nodeEditor.draw();
+  }
 };
 
 window.updateNodeParam = function(key, value) {
@@ -4054,6 +4164,120 @@ function hideLogModal() {
   document.getElementById('logModal').classList.remove('show');
 }
 
+// AI Memory Modal functionality
+function showAIMemoryModal() {
+  document.getElementById('aiMemoryModal').classList.add('show');
+  updateAIMemoryDisplay();
+}
+
+function hideAIMemoryModal() {
+  document.getElementById('aiMemoryModal').classList.remove('show');
+}
+
+function updateAIMemoryDisplay() {
+  const memoryContent = document.getElementById('aiMemoryContent');
+  const filterInput = document.getElementById('aiMemoryFilter');
+  const filterValue = filterInput ? filterInput.value.toLowerCase().trim() : '';
+  
+  if (!memoryContent) {
+    console.error('AI memory content element not found');
+    return;
+  }
+  
+  if (!nodeEditor || !nodeEditor.nodes) {
+    memoryContent.innerHTML = '<p class="no-log">Node editor not initialized.</p>';
+    return;
+  }
+  
+  // Get all LLM nodes
+  let llmNodes = nodeEditor.nodes.filter(node => node.type === 'llm-node');
+  
+  // Filter by node name if filter is provided
+  if (filterValue) {
+    llmNodes = llmNodes.filter(node => {
+      const nodeName = (node.title || 'LLM Node').toLowerCase();
+      return nodeName.includes(filterValue);
+    });
+  }
+  
+  if (llmNodes.length === 0) {
+    memoryContent.innerHTML = filterValue 
+      ? `<p class="no-log">No LLM nodes found matching "${filterInput.value}".</p>`
+      : '<p class="no-log">No LLM nodes found in the canvas.</p>';
+    return;
+  }
+  
+  // Check if any node has memory
+  const nodesWithMemory = llmNodes.filter(node => node.memory && node.memory.length > 0);
+  
+  if (nodesWithMemory.length === 0) {
+    memoryContent.innerHTML = '<p class="no-log">No LLM nodes have memory entries yet. Execute LLM nodes to see their outputs.</p>';
+    return;
+  }
+  
+  // Build memory display as plain text
+  let textContent = '';
+  let totalEntries = 0;
+  
+  nodesWithMemory.forEach((node, nodeIndex) => {
+    const nodeName = node.title || `LLM Node ${nodeIndex + 1}`;
+    const memory = node.memory || [];
+    totalEntries += memory.length;
+    
+    // Display memory entries in reverse order (newest first)
+    memory.slice().reverse().forEach((entry, entryIndex) => {
+      const date = new Date(entry.timestamp);
+      const formattedDate = date.toLocaleString();
+      const relativeTime = getRelativeTime(entry.timestamp);
+      const outputText = entry.output || '';
+      
+      // Format: [Node Name] [Timestamp] [Relative Time]
+      // Output text (plain)
+      textContent += `[${nodeName}] [${formattedDate}] [${relativeTime}]\n`;
+      textContent += `${outputText}\n`;
+      textContent += `\n${'='.repeat(80)}\n\n`;
+    });
+  });
+  
+  // Add summary at the top
+  const summary = `Total: ${totalEntries} memory ${totalEntries === 1 ? 'entry' : 'entries'} from ${nodesWithMemory.length} ${nodesWithMemory.length === 1 ? 'node' : 'nodes'}\n${'='.repeat(80)}\n\n`;
+  textContent = summary + textContent;
+  
+  // Display as plain text with proper formatting
+  memoryContent.innerHTML = `<pre style="color: #e0e0e0; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; padding: 10px;">${escapeHtml(textContent.trim())}</pre>`;
+  
+  // Scroll to top
+  memoryContent.scrollTop = 0;
+}
+
+function filterAIMemory() {
+  updateAIMemoryDisplay();
+}
+
+function clearAllAIMemory() {
+  if (!nodeEditor || !nodeEditor.nodes) {
+    showMessage('Node editor not initialized', 'error');
+    return;
+  }
+  
+  if (!confirm('Are you sure you want to clear all memory from all LLM nodes? This action cannot be undone.')) {
+    return;
+  }
+  
+  const llmNodes = nodeEditor.nodes.filter(node => node.type === 'llm-node');
+  let clearedCount = 0;
+  
+  llmNodes.forEach(node => {
+    if (node.memory && node.memory.length > 0) {
+      node.memory = [];
+      clearedCount++;
+    }
+  });
+  
+  updateAIMemoryDisplay();
+  showMessage(`Cleared memory from ${clearedCount} LLM node${clearedCount === 1 ? '' : 's'}`, 'success');
+}
+
 function updateLogDisplay() {
   const logContent = document.getElementById('logContent');
   
@@ -4096,6 +4320,60 @@ function copyLog() {
     showMessage('Failed to copy log', 'error');
   });
 }
+
+// Helper functions for LLM memory display
+function getRelativeTime(timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days} day${days === 1 ? '' : 's'} ago`;
+  if (hours > 0) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (minutes > 0) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  return `${seconds} second${seconds === 1 ? '' : 's'} ago`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Clear memory for a specific node
+window.clearNodeMemory = function(nodeId) {
+  if (!nodeEditor || !nodeEditor.nodes) {
+    showMessage('Node editor not initialized', 'error');
+    return;
+  }
+  
+  const node = nodeEditor.nodes.find(n => n.id == nodeId || String(n.id) === String(nodeId));
+  
+  if (!node || node.type !== 'llm-node') {
+    showMessage('Node not found or not an LLM node', 'error');
+    return;
+  }
+  
+  if (!node.memory || node.memory.length === 0) {
+    showMessage('This node has no memory to clear', 'info');
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to clear memory from "${node.title || 'LLM Node'}"? This action cannot be undone.`)) {
+    return;
+  }
+  
+  node.memory = [];
+  
+  // Refresh properties panel if this node is selected
+  if (nodeEditor.selectedNode && (nodeEditor.selectedNode.id == nodeId || String(nodeEditor.selectedNode.id) === String(nodeId))) {
+    updatePropertiesPanel(nodeEditor.selectedNode);
+  }
+  
+  showMessage('Memory cleared', 'success');
+};
 
 // Signal Popup functionality
 function showSignalPopup(params) {

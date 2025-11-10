@@ -458,6 +458,12 @@ class NodeEditor {
       outputs: nodeConfig.outputs,
       params: { ...nodeConfig.params }
     };
+    
+    // Initialize memory for LLM nodes
+    if (type === 'llm-node') {
+      node.memory = [];
+    }
+    
     this.nodes.push(node);
     
     // Auto-connect to the previously created node (if enabled and if it exists)
@@ -886,6 +892,15 @@ class NodeEditor {
       outputs: [...nodeData.outputs],
       params: { ...nodeData.params }
     };
+
+    // Restore memory for LLM nodes if it exists
+    if (nodeData.type === 'llm-node' && nodeData.memory) {
+      node.memory = [...nodeData.memory];
+      // Also restore llmResponse if it exists
+      if (nodeData.llmResponse) {
+        node.llmResponse = nodeData.llmResponse;
+      }
+    }
 
     this.nodes.push(node);
     return node;
@@ -2186,6 +2201,21 @@ class NodeEditor {
                 window.showMessage('OpenRouter is not enabled. Please enable it in settings.', 'error');
               }
               node.llmResponse = 'Error: OpenRouter not enabled';
+              
+              // Record error output in memory with timestamp
+              if (!node.memory) {
+                node.memory = [];
+              }
+              node.memory.push({
+                output: 'Error: OpenRouter not enabled',
+                timestamp: Date.now()
+              });
+              
+              // Refresh properties panel if this node is selected (to show updated memory)
+              if (window.updatePropertiesPanel && this.selectedNode === node) {
+                window.updatePropertiesPanel(node);
+              }
+              
               result = false;
               break;
             }
@@ -2196,6 +2226,21 @@ class NodeEditor {
                 window.showMessage('OpenRouter API key not configured. Please set it in settings.', 'error');
               }
               node.llmResponse = 'Error: API key not configured';
+              
+              // Record error output in memory with timestamp
+              if (!node.memory) {
+                node.memory = [];
+              }
+              node.memory.push({
+                output: 'Error: API key not configured',
+                timestamp: Date.now()
+              });
+              
+              // Refresh properties panel if this node is selected (to show updated memory)
+              if (window.updatePropertiesPanel && this.selectedNode === node) {
+                window.updatePropertiesPanel(node);
+              }
+              
               result = false;
               break;
             }
@@ -2281,6 +2326,20 @@ class NodeEditor {
                 // Store the LLM response in the node for string output connections
                 node.llmResponse = llmResult.data.response;
 
+                // Record output in memory with timestamp
+                if (!node.memory) {
+                  node.memory = [];
+                }
+                node.memory.push({
+                  output: llmResult.data.response,
+                  timestamp: Date.now()
+                });
+
+                // Refresh properties panel if this node is selected (to show updated memory)
+                if (window.updatePropertiesPanel && this.selectedNode === node) {
+                  window.updatePropertiesPanel(node);
+                }
+
                 if (window.showMessage) {
                   window.showMessage(`LLM response: ${node.llmResponse.substring(0, 50)}...`, 'success');
                 }
@@ -2292,6 +2351,21 @@ class NodeEditor {
                   window.showMessage(`LLM call failed: ${llmResult.error}`, 'error');
                 }
                 node.llmResponse = 'Error: LLM call failed';
+                
+                // Record error output in memory with timestamp
+                if (!node.memory) {
+                  node.memory = [];
+                }
+                node.memory.push({
+                  output: 'Error: LLM call failed',
+                  timestamp: Date.now()
+                });
+                
+                // Refresh properties panel if this node is selected (to show updated memory)
+                if (window.updatePropertiesPanel && this.selectedNode === node) {
+                  window.updatePropertiesPanel(node);
+                }
+                
                 result = false; // Stop trigger flow on error
               }
             } else {
@@ -2300,6 +2374,21 @@ class NodeEditor {
                 window.showMessage('LLM API not available - check Python bridge', 'error');
               }
               node.llmResponse = 'Error: API not available';
+              
+              // Record error output in memory with timestamp
+              if (!node.memory) {
+                node.memory = [];
+              }
+              node.memory.push({
+                output: 'Error: API not available',
+                timestamp: Date.now()
+              });
+              
+              // Refresh properties panel if this node is selected (to show updated memory)
+              if (window.updatePropertiesPanel && this.selectedNode === node) {
+                window.updatePropertiesPanel(node);
+              }
+              
               result = false; // Stop trigger flow on error
             }
           } catch (error) {
@@ -2308,6 +2397,21 @@ class NodeEditor {
               window.showMessage(`LLM error: ${error.message}`, 'error');
             }
             node.llmResponse = 'Error: ' + error.message;
+            
+            // Record error output in memory with timestamp
+            if (!node.memory) {
+              node.memory = [];
+            }
+            node.memory.push({
+              output: 'Error: ' + error.message,
+              timestamp: Date.now()
+            });
+            
+            // Refresh properties panel if this node is selected (to show updated memory)
+            if (window.updatePropertiesPanel && this.selectedNode === node) {
+              window.updatePropertiesPanel(node);
+            }
+            
             result = false; // Stop trigger flow on error
           }
           break;
