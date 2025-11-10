@@ -39,6 +39,10 @@ class NodeEditor {
     // Simulator mode state
     this.simulatorMode = false;
 
+    // Auto-connect state (default: true)
+    this.autoConnectEnabled = true;
+    this.loadAutoConnectSetting();
+
     this.setupCanvas();
     this.setupEventListeners();
     this.animate();
@@ -328,6 +332,14 @@ class NodeEditor {
       e.preventDefault();
       this.undoLastDeletion();
     }
+
+    // Ctrl+Shift+A to toggle auto-connect
+    if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+      if (!isTextInput) {
+        e.preventDefault();
+        this.toggleAutoConnect();
+      }
+    }
   }
 
   onKeyUp(e) {
@@ -448,8 +460,8 @@ class NodeEditor {
     };
     this.nodes.push(node);
     
-    // Auto-connect to the previously created node (if it exists)
-    if (this.nodes.length > 1) {
+    // Auto-connect to the previously created node (if enabled and if it exists)
+    if (this.autoConnectEnabled && this.nodes.length > 1) {
       // Get the previous node (the one before the current node)
       const previousNode = this.nodes[this.nodes.length - 2];
       
@@ -892,6 +904,49 @@ class NodeEditor {
     const undoHint = document.getElementById('undoHint');
     if (undoHint) {
       undoHint.style.display = 'none';
+    }
+  }
+
+  loadAutoConnectSetting() {
+    // Load auto-connect setting from settings manager
+    if (window.settingsManager) {
+      const setting = window.settingsManager.get('autoConnectNodes');
+      this.autoConnectEnabled = setting !== false; // Default to true if not set
+    }
+  }
+
+  async toggleAutoConnect() {
+    this.autoConnectEnabled = !this.autoConnectEnabled;
+    
+    // Save to settings
+    if (window.settingsManager) {
+      await window.settingsManager.set('autoConnectNodes', this.autoConnectEnabled);
+    }
+    
+    // Show hint
+    this.showAutoConnectHint();
+  }
+
+  showAutoConnectHint() {
+    const hint = document.getElementById('autoConnectHint');
+    if (hint) {
+      const status = this.autoConnectEnabled ? 'ON' : 'OFF';
+      const color = this.autoConnectEnabled ? '#4CAF50' : '#FF5722';
+      hint.textContent = `Auto-connect: ${status} (Press Ctrl+Shift+A to toggle)`;
+      hint.style.color = color;
+      hint.style.display = 'inline';
+      
+      // Hide after 3 seconds
+      setTimeout(() => {
+        this.hideAutoConnectHint();
+      }, 3000);
+    }
+  }
+
+  hideAutoConnectHint() {
+    const hint = document.getElementById('autoConnectHint');
+    if (hint) {
+      hint.style.display = 'none';
     }
   }
 

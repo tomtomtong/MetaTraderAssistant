@@ -67,11 +67,6 @@
   },
   "overtradeControl": {
     "enabled": true,
-    "maxTradesPerHour": 10,
-    "maxTradesPerDay": 50,
-    "cooldownMinutes": 5,
-    "warningEnabled": true,
-    "blockTrading": false,
     "maxTrades": 5,
     "timePeriod": "hour",
     "reminderFrequency": "first",
@@ -91,6 +86,7 @@
     },
     "theme": "dark"
   },
+  "autoConnectNodes": true,
   "historicalData": null,
   "mt5Trading": {
     "symbol": "BTCUSD",

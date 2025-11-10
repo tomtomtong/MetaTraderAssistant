@@ -94,6 +94,9 @@ class SettingsManager {
         theme: 'dark'
       },
       
+      // Node editor settings
+      autoConnectNodes: true,
+      
       // Historical data for backtesting
       historicalData: null,
       
