@@ -173,26 +173,41 @@ class MT5Bridge:
     
     def get_positions(self):
         """Get open positions (real or simulated)"""
+        # SIMULATOR MODE: Return simulated positions (works without MT5 connection)
+        if self.simulator_mode:
+            # Update prices for all simulated positions if MT5 is connected
+            sim_positions = self.simulator.get_positions()
+            if self.connected_to_mt5:
+                for pos in sim_positions:
+                    tick = mt5.symbol_info_tick(pos['symbol'])
+                    if tick:
+                        current_price = tick.bid if pos['type'] == 'BUY' else tick.ask
+                        symbol_info = mt5.symbol_info(pos['symbol'])
+                        contract_size = symbol_info.trade_contract_size if symbol_info else 100000
+                        self.simulator.update_position_prices(pos['symbol'], current_price, contract_size)
+                
+                # Check for TP/SL hits
+                self.simulator.check_tp_sl_hits()
+            
+            # Normalize simulator positions to match real position format
+            result = []
+            for pos in sim_positions:
+                result.append({
+                    "ticket": pos['ticket'],
+                    "symbol": pos['symbol'],
+                    "type": pos['type'],
+                    "volume": pos['volume'],
+                    "open_price": pos['open_price'],
+                    "current_price": pos['current_price'],
+                    "profit": pos['profit'],
+                    "stop_loss": pos.get('sl', 0),  # Convert 'sl' to 'stop_loss'
+                    "take_profit": pos.get('tp', 0)  # Convert 'tp' to 'take_profit'
+                })
+            return result
+        
+        # REAL MODE: Require MT5 connection
         if not self.connected_to_mt5:
             return {"error": "Not connected to MT5"}
-        
-        # SIMULATOR MODE: Return simulated positions
-        if self.simulator_mode:
-            # Update prices for all simulated positions
-            sim_positions = self.simulator.get_positions()
-            for pos in sim_positions:
-                tick = mt5.symbol_info_tick(pos['symbol'])
-                if tick:
-                    current_price = tick.bid if pos['type'] == 'BUY' else tick.ask
-                    symbol_info = mt5.symbol_info(pos['symbol'])
-                    contract_size = symbol_info.trade_contract_size if symbol_info else 100000
-                    self.simulator.update_position_prices(pos['symbol'], current_price, contract_size)
-            
-            # Check for TP/SL hits
-            self.simulator.check_tp_sl_hits()
-            
-            # Return updated positions
-            return self.simulator.get_positions()
         
         # REAL MODE: Return actual positions
         positions = mt5.positions_get()
@@ -364,12 +379,13 @@ class MT5Bridge:
     
     def modify_position(self, ticket, sl=None, tp=None):
         """Modify stop loss and take profit of a position (real or simulated)"""
-        if not self.connected_to_mt5:
-            return {"success": False, "error": "Not connected to MT5"}
-        
-        # SIMULATOR MODE: Modify simulated position
+        # SIMULATOR MODE: Modify simulated position (works without MT5 connection)
         if self.simulator_mode:
             return self.simulator.modify_position(ticket, sl, tp)
+        
+        # REAL MODE: Require MT5 connection
+        if not self.connected_to_mt5:
+            return {"success": False, "error": "Not connected to MT5"}
         
         # REAL MODE: Modify actual position
         positions = mt5.positions_get(ticket=ticket)

@@ -1032,6 +1032,62 @@ async function toggleSimulatorMode(enabled) {
   }
 }
 
+// Toggle simulator mode via hotkey (Ctrl+Shift+S)
+async function toggleSimulatorModeHotkey() {
+  try {
+    let currentMode = false;
+    let gotStatusFromAPI = false;
+    
+    // Try to get current simulator mode status from API (if connected)
+    if (isConnected) {
+      try {
+        const result = await window.mt5API.getSimulatorStatus();
+        if (result.success) {
+          currentMode = result.data.simulator_mode;
+          gotStatusFromAPI = true;
+        }
+      } catch (apiError) {
+        // API call failed, fall through to settings file check
+        console.log('Could not get simulator status from API, checking settings file');
+      }
+    }
+    
+    // If not connected or API failed, check settings file
+    if (!gotStatusFromAPI) {
+      if (window.electronAPI && window.electronAPI.loadSettings) {
+        try {
+          const settings = await window.electronAPI.loadSettings('app_settings.json');
+          currentMode = settings && settings.simulatorMode === true;
+        } catch (settingsError) {
+          console.error('Error reading settings file:', settingsError);
+        }
+      }
+    }
+    
+    // Toggle to opposite mode
+    if (isConnected) {
+      await toggleSimulatorMode(!currentMode);
+    } else {
+      // If not connected, we can still update the settings file
+      // but show a message that connection is needed for full functionality
+      if (window.electronAPI && window.electronAPI.loadSettings && window.electronAPI.saveSettings) {
+        const settings = await window.electronAPI.loadSettings('app_settings.json') || {};
+        settings.simulatorMode = !currentMode;
+        await window.electronAPI.saveSettings('app_settings.json', settings);
+        showMessage(
+          `Simulator mode ${!currentMode ? 'ENABLED' : 'DISABLED'} in settings. Connect to MT5 to activate.`,
+          'info'
+        );
+      } else {
+        showMessage('Please connect to MT5 to toggle simulator mode', 'warning');
+      }
+    }
+  } catch (error) {
+    console.error('Error toggling simulator mode via hotkey:', error);
+    showMessage('Error toggling simulator mode: ' + error.message, 'error');
+  }
+}
+
 // Toggle light mode theme
 function toggleLightMode(enabled, showNotification = false) {
   if (enabled) {
@@ -1545,7 +1601,7 @@ async function handleRefreshPositions() {
             Vol: ${pos.volume} | Entry: ${pos.open_price.toFixed(5)} | Current: ${pos.current_price.toFixed(5)}
           </div>
           <div class="position-details">
-            SL: ${pos.stop_loss > 0 ? pos.stop_loss.toFixed(5) : 'None'} | TP: ${pos.take_profit > 0 ? pos.take_profit.toFixed(5) : 'None'}
+            SL: ${(pos.stop_loss && pos.stop_loss > 0) ? pos.stop_loss.toFixed(5) : 'None'} | TP: ${(pos.take_profit && pos.take_profit > 0) ? pos.take_profit.toFixed(5) : 'None'}
           </div>
           <div class="position-actions">
             <button class="btn btn-small btn-primary" onclick="showModifyModal(${pos.ticket}, ${pos.stop_loss}, ${pos.take_profit})">Modify</button>
@@ -1595,8 +1651,8 @@ function showModifyModal(ticket, currentSL, currentTP) {
   const position = currentPositions.find(pos => pos.ticket == ticket);
   
   document.getElementById('modifyTicket').value = ticket;
-  document.getElementById('modifyStopLoss').value = currentSL > 0 ? currentSL : '';
-  document.getElementById('modifyTakeProfit').value = currentTP > 0 ? currentTP : '';
+  document.getElementById('modifyStopLoss').value = (currentSL && currentSL > 0) ? currentSL : '';
+  document.getElementById('modifyTakeProfit').value = (currentTP && currentTP > 0) ? currentTP : '';
   
   // Clear percentage inputs
   document.getElementById('modifyStopLossPercent').value = '';
@@ -1618,11 +1674,18 @@ function hideModifyModal() {
 
 async function handleModifyPosition() {
   const ticket = parseInt(document.getElementById('modifyTicket').value);
-  const slValue = document.getElementById('modifyStopLoss').value;
-  const tpValue = document.getElementById('modifyTakeProfit').value;
+  const slValue = document.getElementById('modifyStopLoss').value.trim();
+  const tpValue = document.getElementById('modifyTakeProfit').value.trim();
   
-  const stopLoss = slValue ? parseFloat(slValue) : 0;
-  const takeProfit = tpValue ? parseFloat(tpValue) : 0;
+  // Send null for empty values (preserve existing), 0 for explicit 0 (remove SL/TP)
+  const stopLoss = slValue === '' ? null : (slValue === '0' ? 0 : parseFloat(slValue));
+  const takeProfit = tpValue === '' ? null : (tpValue === '0' ? 0 : parseFloat(tpValue));
+
+  // Validate that at least one value is being modified
+  if (stopLoss === null && takeProfit === null) {
+    showMessage('Please enter at least one value to modify (SL or TP)', 'error');
+    return;
+  }
 
   hideModifyModal();
   // Record position management action (doesn't count for overtrade)
@@ -4813,6 +4876,25 @@ async function showSettingsModal() {
     await toggleSimulatorMode(enabled);
   };
   document.getElementById('resetSimulatorBtn').onclick = resetSimulator;
+  
+  // Hotkey for toggling simulator mode (Ctrl+Shift+S)
+  document.addEventListener('keydown', (e) => {
+    // Check for Ctrl+Shift+S (or Cmd+Shift+S on Mac)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+      // Prevent default browser behavior
+      e.preventDefault();
+      // Don't trigger if user is typing in an input field
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.isContentEditable
+      );
+      if (!isInputFocused) {
+        toggleSimulatorModeHotkey();
+      }
+    }
+  });
   
   // Track changes in settings form
   setupSettingsChangeTracking();
