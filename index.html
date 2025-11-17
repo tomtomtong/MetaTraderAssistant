@@ -991,48 +991,50 @@
     <div class="modal-content trade-confirmation-modal">
       <h2>📊 Confirm Trade Execution</h2>
       
-      <div class="trade-confirmation-details">
-        <div class="confirmation-item">
-          <span class="label">Symbol:</span>
-          <span id="confirmTradeSymbol" class="value">-</span>
+      <div class="trade-confirmation-modal-content">
+        <div class="trade-confirmation-details">
+          <div class="confirmation-item">
+            <span class="label">Symbol:</span>
+            <span id="confirmTradeSymbol" class="value">-</span>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Action:</span>
+            <span id="confirmTradeType" class="value trade-type">-</span>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Volume:</span>
+            <span id="confirmTradeVolume" class="value">-</span>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Current Price:</span>
+            <span id="confirmTradeCurrentPrice" class="value">Loading...</span>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Stop Loss <span style="color: #f44336;">*</span>:</span>
+            <input type="number" id="confirmTradeStopLoss" class="value confirmation-input" step="0.00001" placeholder="Enter stop loss" required>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Take Profit <span style="color: #f44336;">*</span>:</span>
+            <input type="number" id="confirmTradeTakeProfit" class="value confirmation-input" step="0.00001" placeholder="Enter take profit" required>
+          </div>
         </div>
-        <div class="confirmation-item">
-          <span class="label">Action:</span>
-          <span id="confirmTradeType" class="value trade-type">-</span>
+        
+        <div class="confirmation-notice">
+          <p>⚠️ Please review the trade details before confirming</p>
         </div>
-        <div class="confirmation-item">
-          <span class="label">Volume:</span>
-          <span id="confirmTradeVolume" class="value">-</span>
-        </div>
-        <div class="confirmation-item">
-          <span class="label">Current Price:</span>
-          <span id="confirmTradeCurrentPrice" class="value">Loading...</span>
-        </div>
-        <div class="confirmation-item">
-          <span class="label">Stop Loss <span style="color: #f44336;">*</span>:</span>
-          <input type="number" id="confirmTradeStopLoss" class="value confirmation-input" step="0.00001" placeholder="Enter stop loss" required>
-        </div>
-        <div class="confirmation-item">
-          <span class="label">Take Profit <span style="color: #f44336;">*</span>:</span>
-          <input type="number" id="confirmTradeTakeProfit" class="value confirmation-input" step="0.00001" placeholder="Enter take profit" required>
-        </div>
-      </div>
-      
-      <div class="confirmation-notice">
-        <p>⚠️ Please review the trade details before confirming</p>
-      </div>
-      
-      <!-- 6 Month Daily Chart -->
-      <div class="chart-container-wrapper">
-        <h3 style="margin-top: 20px; margin-bottom: 10px;">📊 6-Month Daily Chart</h3>
-        <div id="chartLoading" class="chart-loading" style="text-align: center; padding: 20px; color: #888;">
-          Loading chart data...
-        </div>
-        <div id="chartError" class="chart-error" style="display: none; text-align: center; padding: 20px; color: #f44336;">
-          Failed to load chart data
-        </div>
-        <div style="position: relative; width: 100%; height: 500px;">
-          <canvas id="tradeChart" style="display: none; width: 100%; height: 100%;"></canvas>
+        
+        <!-- 6 Month Daily Chart -->
+        <div class="chart-container-wrapper">
+          <h3 style="margin-top: 20px; margin-bottom: 10px;">📊 6-Month Daily Chart</h3>
+          <div id="chartLoading" class="chart-loading" style="text-align: center; padding: 20px; color: #888;">
+            Loading chart data...
+          </div>
+          <div id="chartError" class="chart-error" style="display: none; text-align: center; padding: 20px; color: #f44336;">
+            Failed to load chart data
+          </div>
+          <div style="position: relative; width: 100%; height: 500px;">
+            <canvas id="tradeChart" style="display: none; width: 100%; height: 100%;"></canvas>
+          </div>
         </div>
       </div>
       
