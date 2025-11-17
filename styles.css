@@ -3054,10 +3054,10 @@ ter scrollbar for settings modal */
   padding-top: 15px;
   border-top: 1px solid #444;
   flex-shrink: 0; /* Don't shrink buttons */
-}/* Trade
- Confirmation Modal Styles */
+}/* Trade Confirmation Modal Styles */
 .trade-confirmation-modal {
-  max-width: 600px;
+  max-width: 900px;
+  width: 90%;
   animation: slideDown 0.3s ease-out;
 }
 
@@ -3141,38 +3141,48 @@ ter scrollbar for settings modal */
   font-weight: bold;
 }
 
-/* Chart Container Styles */
+/* Chart Container Styles - TradingView Inspired */
 .chart-container-wrapper {
-  background: #1a1a1a;
-  border: 1px solid #444;
+  background: linear-gradient(180deg, #131722 0%, #1a1d28 100%);
+  border: 1px solid #2a2e39;
   border-radius: 8px;
-  padding: 15px;
+  padding: 20px;
   margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .chart-container-wrapper h3 {
-  color: #64B5F6;
-  font-size: 14px;
-  margin: 0 0 15px 0;
-  padding: 0;
-  border: none;
+  color: #b2b5be;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  padding: 0 0 12px 0;
+  border-bottom: 1px solid #2a2e39;
   text-transform: none;
-  letter-spacing: normal;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .chart-loading {
-  color: #888;
+  color: #787b86;
   font-size: 14px;
-  padding: 20px;
+  padding: 40px 20px;
   text-align: center;
+  background: linear-gradient(180deg, #131722 0%, #1a1d28 100%);
+  border-radius: 6px;
+  border: 1px dashed #2a2e39;
 }
 
 .chart-error {
-  color: #f44336;
+  color: #ef5350;
   font-size: 14px;
-  padding: 20px;
+  padding: 40px 20px;
   text-align: center;
-  background: rgba(244, 67, 54, 0.1);
+  background: linear-gradient(180deg, #1e1825 0%, #251d2a 100%);
+  border-radius: 6px;
+  border: 1px solid #4a2c2e;
   border-radius: 4px;
 }
 

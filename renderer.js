@@ -1409,9 +1409,12 @@ async function fetchThreeMonthDailyData(symbol) {
 // Function to plot the 6-month daily chart
 function plotThreeMonthChart(symbol, data) {
   try {
-    // Check if Chart.js is available
+    // Check if Chart.js and financial chart plugin are available
     if (typeof Chart === 'undefined') {
       throw new Error('Chart.js library is not loaded');
+    }
+    if (typeof Chart.controllers.candlestick === 'undefined') {
+      console.warn('Financial chart plugin not loaded, falling back to basic chart');
     }
 
     // Destroy existing chart if it exists
@@ -1439,18 +1442,15 @@ function plotThreeMonthChart(symbol, data) {
     chartCanvas.style.display = 'block';
 
     // Ensure canvas has proper dimensions
-    // The canvas is wrapped in a div container
     const canvasContainer = chartCanvas.parentElement;
     if (canvasContainer) {
       const containerWidth = canvasContainer.clientWidth || 800;
-      const containerHeight = canvasContainer.clientHeight || 400;
-      // Set canvas dimensions to match container
+      const containerHeight = canvasContainer.clientHeight || 500;
       chartCanvas.width = containerWidth;
       chartCanvas.height = containerHeight;
     } else {
-      // Fallback dimensions
       chartCanvas.width = 800;
-      chartCanvas.height = 400;
+      chartCanvas.height = 500;
     }
 
     // Validate data
@@ -1458,31 +1458,33 @@ function plotThreeMonthChart(symbol, data) {
       throw new Error('No chart data available');
     }
 
-    // Prepare data for Chart.js
-    const labels = data.map(item => {
-      try {
-        const date = new Date(item.time);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      } catch (e) {
-        return '';
-      }
-    }).filter(label => label !== '');
+    // Prepare OHLC data for candlestick chart
+    const candlestickData = data.map(item => {
+      const time = new Date(item.time).getTime();
+      return {
+        x: time,
+        o: parseFloat(item.open),
+        h: parseFloat(item.high),
+        l: parseFloat(item.low),
+        c: parseFloat(item.close)
+      };
+    }).filter(item => !isNaN(item.o) && !isNaN(item.h) && !isNaN(item.l) && !isNaN(item.c));
 
-    const closePrices = data.map(item => {
-      const price = parseFloat(item.close);
-      return isNaN(price) ? 0 : price;
-    });
-    const highPrices = data.map(item => {
-      const price = parseFloat(item.high);
-      return isNaN(price) ? 0 : price;
-    });
-    const lowPrices = data.map(item => {
-      const price = parseFloat(item.low);
-      return isNaN(price) ? 0 : price;
-    });
+    // Prepare volume data
+    const volumeData = data.map(item => {
+      const time = new Date(item.time).getTime();
+      const volume = parseFloat(item.tick_volume || 0);
+      return {
+        x: time,
+        y: volume
+      };
+    }).filter(item => !isNaN(item.y));
+
+    // Calculate max volume for scaling
+    const maxVolume = Math.max(...volumeData.map(v => v.y));
 
     // Get current price for reference
-    const currentPrice = closePrices.length > 0 ? closePrices[closePrices.length - 1] : 0;
+    const currentPrice = candlestickData.length > 0 ? candlestickData[candlestickData.length - 1].c : 0;
 
     // Create chart
     const ctx = chartCanvas.getContext('2d');
@@ -1490,120 +1492,204 @@ function plotThreeMonthChart(symbol, data) {
       throw new Error('Could not get canvas context');
     }
 
+    // Determine price decimals
+    const avgPrice = candlestickData.reduce((sum, d) => sum + d.c, 0) / candlestickData.length;
+    const priceDecimals = avgPrice >= 1000 ? 2 : avgPrice >= 10 ? 3 : 5;
+
     tradeChartInstance = new Chart(ctx, {
-      type: 'line',
+      type: 'candlestick',
       data: {
-        labels: labels,
         datasets: [
           {
-            label: 'Close Price',
-            data: closePrices,
-            borderColor: '#4CAF50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.1,
-            pointRadius: 0,
-            pointHoverRadius: 4
+            label: symbol,
+            data: candlestickData,
+            borderColor: 'rgba(255, 255, 255, 0.8)',
+            color: {
+              up: 'rgba(38, 166, 154, 0.9)',    // Teal/green for bullish
+              down: 'rgba(239, 83, 80, 0.9)',   // Red for bearish
+              unchanged: 'rgba(158, 158, 158, 0.9)'
+            },
+            borderWidth: 1.5,
+            barThickness: 'flex',
+            maxBarThickness: 8,
+            yAxisID: 'y-price'
           },
           {
-            label: 'High',
-            data: highPrices,
-            borderColor: 'rgba(76, 175, 80, 0.3)',
-            borderWidth: 1,
-            fill: false,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            borderDash: [5, 5]
-          },
-          {
-            label: 'Low',
-            data: lowPrices,
-            borderColor: 'rgba(244, 67, 54, 0.3)',
-            borderWidth: 1,
-            fill: false,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            borderDash: [5, 5]
+            label: 'Volume',
+            data: volumeData,
+            type: 'bar',
+            backgroundColor: volumeData.map((v, i) => {
+              if (i === 0) return 'rgba(158, 158, 158, 0.3)';
+              const prevClose = candlestickData[i - 1]?.c;
+              const currClose = candlestickData[i]?.c;
+              if (currClose > prevClose) {
+                return 'rgba(38, 166, 154, 0.3)'; // Green volume
+              } else {
+                return 'rgba(239, 83, 80, 0.3)';  // Red volume
+              }
+            }),
+            borderWidth: 0,
+            yAxisID: 'y-volume',
+            barPercentage: 0.8,
+            categoryPercentage: 1.0
           }
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: {
+            left: 10,
+            right: 25,
+            top: 10,
+            bottom: 10
+          }
+        },
         plugins: {
           title: {
             display: true,
-            text: `${symbol} - 6 Month Daily Chart`,
+            text: `${symbol} - 6 Month Daily Chart (Candlestick)`,
             color: '#e0e0e0',
             font: {
               size: 16,
-              weight: 'bold'
+              weight: 'bold',
+              family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
             },
             padding: {
-              top: 10,
-              bottom: 20
+              top: 5,
+              bottom: 15
             }
           },
           legend: {
             display: true,
             position: 'top',
+            align: 'end',
             labels: {
-              color: '#e0e0e0',
+              color: '#b0b0b0',
               usePointStyle: true,
-              padding: 15
+              padding: 15,
+              font: {
+                size: 11,
+                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+              },
+              filter: function(item) {
+                return item.text !== 'Volume'; // Hide volume from legend
+              }
             }
           },
           tooltip: {
+            enabled: true,
             mode: 'index',
             intersect: false,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            titleColor: '#e0e0e0',
+            backgroundColor: 'rgba(17, 17, 17, 0.95)',
+            titleColor: '#ffffff',
             bodyColor: '#e0e0e0',
             borderColor: '#444',
             borderWidth: 1,
             padding: 12,
+            titleFont: {
+              size: 13,
+              weight: 'bold',
+              family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+            },
+            bodyFont: {
+              size: 12,
+              family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+            },
+            displayColors: false,
             callbacks: {
+              title: function(context) {
+                if (context[0] && context[0].raw && context[0].raw.x) {
+                  const date = new Date(context[0].raw.x);
+                  return date.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  });
+                }
+                return '';
+              },
               label: function(context) {
-                const value = context.parsed.y;
-                const decimals = value >= 1000 ? 2 : 5;
-                return `${context.dataset.label}: ${value.toFixed(decimals)}`;
+                const dataPoint = context.raw;
+                if (context.datasetIndex === 0 && dataPoint.o !== undefined) {
+                  // Candlestick data
+                  const change = dataPoint.c - dataPoint.o;
+                  const changePercent = ((change / dataPoint.o) * 100).toFixed(2);
+                  const changeSymbol = change >= 0 ? '▲' : '▼';
+                  const changeColor = change >= 0 ? '🟢' : '🔴';
+                  
+                  return [
+                    `${changeColor} ${changeSymbol} ${Math.abs(changePercent)}%`,
+                    `Open:  ${dataPoint.o.toFixed(priceDecimals)}`,
+                    `High:  ${dataPoint.h.toFixed(priceDecimals)}`,
+                    `Low:   ${dataPoint.l.toFixed(priceDecimals)}`,
+                    `Close: ${dataPoint.c.toFixed(priceDecimals)}`
+                  ];
+                } else if (context.datasetIndex === 1) {
+                  // Volume data
+                  return `Volume: ${Math.round(dataPoint.y).toLocaleString()}`;
+                }
+                return '';
               }
             }
           }
         },
         scales: {
           x: {
+            type: 'time',
+            time: {
+              unit: 'day',
+              displayFormats: {
+                day: 'MMM d',
+                week: 'MMM d',
+                month: 'MMM yyyy'
+              },
+              tooltipFormat: 'MMM d, yyyy'
+            },
             ticks: {
               color: '#888',
-              maxRotation: 45,
-              minRotation: 45,
-              maxTicksLimit: 15,
+              maxRotation: 0,
+              autoSkipPadding: 15,
               font: {
-                size: 10
+                size: 10,
+                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
               }
             },
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)',
+              display: false,
               drawBorder: true,
-              borderColor: '#444'
+              borderColor: '#333'
             }
           },
-          y: {
+          'y-price': {
+            type: 'linear',
+            position: 'right',
             ticks: {
               color: '#888',
               font: {
-                size: 10
+                size: 10,
+                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
               },
               callback: function(value) {
-                const decimals = value >= 1000 ? 2 : 5;
-                return value.toFixed(decimals);
+                return value.toFixed(priceDecimals);
               }
             },
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)',
+              color: 'rgba(255, 255, 255, 0.06)',
               drawBorder: true,
-              borderColor: '#444'
+              borderColor: '#333'
+            }
+          },
+          'y-volume': {
+            type: 'linear',
+            position: 'right',
+            display: false,
+            max: maxVolume * 4, // Scale volume to 25% of chart height
+            min: 0,
+            grid: {
+              display: false
             }
           }
         },
@@ -1612,12 +1698,12 @@ function plotThreeMonthChart(symbol, data) {
           intersect: false
         },
         animation: {
-          duration: 750
+          duration: 400
         }
       }
     });
 
-    console.log(`Chart plotted successfully with ${data.length} data points for ${symbol}`);
+    console.log(`Candlestick chart plotted successfully with ${candlestickData.length} candles for ${symbol}`);
   } catch (error) {
     console.error('Error plotting chart:', error);
     const chartLoading = document.getElementById('chartLoading');
@@ -2170,139 +2256,260 @@ function plotModifyChart(symbol, data) {
     if (chartError) chartError.style.display = 'none';
     chartCanvas.style.display = 'block';
     
-    // Ensure canvas has proper dimensions - Chart.js needs explicit width/height
+    // Ensure canvas has proper dimensions
     const container = chartCanvas.parentElement;
     if (container) {
       const containerWidth = container.clientWidth || 800;
+      const containerHeight = container.clientHeight || 500;
       chartCanvas.width = containerWidth;
-      chartCanvas.height = 400;
-      // Also set CSS to maintain aspect ratio
-      chartCanvas.style.width = containerWidth + 'px';
-      chartCanvas.style.height = '400px';
+      chartCanvas.height = containerHeight;
+    } else {
+      chartCanvas.width = 800;
+      chartCanvas.height = 500;
     }
 
-    // Prepare data for Chart.js
-    const labels = data.map(item => {
-      const date = new Date(item.time);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    });
+    // Validate data
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      throw new Error('No chart data available');
+    }
 
-    const closePrices = data.map(item => parseFloat(item.close));
-    const highPrices = data.map(item => parseFloat(item.high));
-    const lowPrices = data.map(item => parseFloat(item.low));
+    // Prepare OHLC data for candlestick chart
+    const candlestickData = data.map(item => {
+      const time = new Date(item.time).getTime();
+      return {
+        x: time,
+        o: parseFloat(item.open),
+        h: parseFloat(item.high),
+        l: parseFloat(item.low),
+        c: parseFloat(item.close)
+      };
+    }).filter(item => !isNaN(item.o) && !isNaN(item.h) && !isNaN(item.l) && !isNaN(item.c));
 
-    // Get current price for reference line
-    const currentPrice = closePrices[closePrices.length - 1];
+    // Prepare volume data
+    const volumeData = data.map(item => {
+      const time = new Date(item.time).getTime();
+      const volume = parseFloat(item.tick_volume || 0);
+      return {
+        x: time,
+        y: volume
+      };
+    }).filter(item => !isNaN(item.y));
+
+    // Calculate max volume for scaling
+    const maxVolume = Math.max(...volumeData.map(v => v.y));
+
+    // Determine price decimals
+    const avgPrice = candlestickData.reduce((sum, d) => sum + d.c, 0) / candlestickData.length;
+    const priceDecimals = avgPrice >= 1000 ? 2 : avgPrice >= 10 ? 3 : 5;
 
     // Create chart
     const ctx = chartCanvas.getContext('2d');
     modifyChartInstance = new Chart(ctx, {
-      type: 'line',
+      type: 'candlestick',
       data: {
-        labels: labels,
         datasets: [
           {
-            label: 'Close Price',
-            data: closePrices,
-            borderColor: '#4CAF50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.1,
-            pointRadius: 0,
-            pointHoverRadius: 4
+            label: symbol,
+            data: candlestickData,
+            borderColor: 'rgba(255, 255, 255, 0.8)',
+            color: {
+              up: 'rgba(38, 166, 154, 0.9)',
+              down: 'rgba(239, 83, 80, 0.9)',
+              unchanged: 'rgba(158, 158, 158, 0.9)'
+            },
+            borderWidth: 1.5,
+            barThickness: 'flex',
+            maxBarThickness: 8,
+            yAxisID: 'y-price'
           },
           {
-            label: 'High',
-            data: highPrices,
-            borderColor: 'rgba(76, 175, 80, 0.3)',
-            borderWidth: 1,
-            fill: false,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            borderDash: [5, 5]
-          },
-          {
-            label: 'Low',
-            data: lowPrices,
-            borderColor: 'rgba(244, 67, 54, 0.3)',
-            borderWidth: 1,
-            fill: false,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            borderDash: [5, 5]
+            label: 'Volume',
+            data: volumeData,
+            type: 'bar',
+            backgroundColor: volumeData.map((v, i) => {
+              if (i === 0) return 'rgba(158, 158, 158, 0.3)';
+              const prevClose = candlestickData[i - 1]?.c;
+              const currClose = candlestickData[i]?.c;
+              if (currClose > prevClose) {
+                return 'rgba(38, 166, 154, 0.3)';
+              } else {
+                return 'rgba(239, 83, 80, 0.3)';
+              }
+            }),
+            borderWidth: 0,
+            yAxisID: 'y-volume',
+            barPercentage: 0.8,
+            categoryPercentage: 1.0
           }
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        aspectRatio: 2.5,
+        layout: {
+          padding: {
+            left: 10,
+            right: 25,
+            top: 10,
+            bottom: 10
+          }
+        },
         plugins: {
           title: {
             display: true,
-            text: `${symbol} - 6 Month Daily Chart`,
+            text: `${symbol} - 6 Month Daily Chart (Candlestick)`,
             color: '#e0e0e0',
             font: {
               size: 16,
-              weight: 'bold'
+              weight: 'bold',
+              family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+            },
+            padding: {
+              top: 5,
+              bottom: 15
             }
           },
           legend: {
             display: true,
             position: 'top',
+            align: 'end',
             labels: {
-              color: '#e0e0e0',
-              usePointStyle: true
+              color: '#b0b0b0',
+              usePointStyle: true,
+              padding: 15,
+              font: {
+                size: 11,
+                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+              },
+              filter: function(item) {
+                return item.text !== 'Volume';
+              }
             }
           },
           tooltip: {
+            enabled: true,
             mode: 'index',
             intersect: false,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            titleColor: '#e0e0e0',
+            backgroundColor: 'rgba(17, 17, 17, 0.95)',
+            titleColor: '#ffffff',
             bodyColor: '#e0e0e0',
             borderColor: '#444',
             borderWidth: 1,
+            padding: 12,
+            titleFont: {
+              size: 13,
+              weight: 'bold',
+              family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+            },
+            bodyFont: {
+              size: 12,
+              family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+            },
+            displayColors: false,
             callbacks: {
+              title: function(context) {
+                if (context[0] && context[0].raw && context[0].raw.x) {
+                  const date = new Date(context[0].raw.x);
+                  return date.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  });
+                }
+                return '';
+              },
               label: function(context) {
-                return `${context.dataset.label}: ${context.parsed.y.toFixed(5)}`;
+                const dataPoint = context.raw;
+                if (context.datasetIndex === 0 && dataPoint.o !== undefined) {
+                  const change = dataPoint.c - dataPoint.o;
+                  const changePercent = ((change / dataPoint.o) * 100).toFixed(2);
+                  const changeSymbol = change >= 0 ? '▲' : '▼';
+                  const changeColor = change >= 0 ? '🟢' : '🔴';
+                  
+                  return [
+                    `${changeColor} ${changeSymbol} ${Math.abs(changePercent)}%`,
+                    `Open:  ${dataPoint.o.toFixed(priceDecimals)}`,
+                    `High:  ${dataPoint.h.toFixed(priceDecimals)}`,
+                    `Low:   ${dataPoint.l.toFixed(priceDecimals)}`,
+                    `Close: ${dataPoint.c.toFixed(priceDecimals)}`
+                  ];
+                } else if (context.datasetIndex === 1) {
+                  return `Volume: ${Math.round(dataPoint.y).toLocaleString()}`;
+                }
+                return '';
               }
             }
           }
         },
         scales: {
           x: {
-            ticks: {
-              color: '#888',
-              maxRotation: 45,
-              minRotation: 45,
-              maxTicksLimit: 15
+            type: 'time',
+            time: {
+              unit: 'day',
+              displayFormats: {
+                day: 'MMM d',
+                week: 'MMM d',
+                month: 'MMM yyyy'
+              },
+              tooltipFormat: 'MMM d, yyyy'
             },
-            grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            }
-          },
-          y: {
             ticks: {
               color: '#888',
-              callback: function(value) {
-                return value.toFixed(5);
+              maxRotation: 0,
+              autoSkipPadding: 15,
+              font: {
+                size: 10,
+                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
               }
             },
             grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
+              display: false,
+              drawBorder: true,
+              borderColor: '#333'
+            }
+          },
+          'y-price': {
+            type: 'linear',
+            position: 'right',
+            ticks: {
+              color: '#888',
+              font: {
+                size: 10,
+                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+              },
+              callback: function(value) {
+                return value.toFixed(priceDecimals);
+              }
+            },
+            grid: {
+              color: 'rgba(255, 255, 255, 0.06)',
+              drawBorder: true,
+              borderColor: '#333'
+            }
+          },
+          'y-volume': {
+            type: 'linear',
+            position: 'right',
+            display: false,
+            max: maxVolume * 4,
+            min: 0,
+            grid: {
+              display: false
             }
           }
         },
         interaction: {
           mode: 'index',
           intersect: false
+        },
+        animation: {
+          duration: 400
         }
       }
     });
 
-    console.log(`Modify chart plotted successfully with ${data.length} data points`);
+    console.log(`Modify candlestick chart plotted successfully with ${candlestickData.length} candles`);
   } catch (error) {
     console.error('Error plotting modify chart:', error);
     const chartLoading = document.getElementById('modifyChartLoading');
@@ -7767,3 +7974,4 @@ function setupAiAnalysisChangeTracking() {
     }
   });
 }
+

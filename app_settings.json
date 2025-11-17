@@ -176,12 +176,12 @@
   },
   "overtradeHistoryReal": [
     {
-      "timestamp": 1763260504828,
+      "timestamp": 1763350256549,
       "type": "manual",
       "data": {
-        "symbol": "XAUUSD",
+        "symbol": "HK50.cash",
         "type": "BUY",
-        "volume": 0.01,
+        "volume": 0.5,
         "stopLoss": 0,
         "takeProfit": 0,
         "action": "executeOrder"

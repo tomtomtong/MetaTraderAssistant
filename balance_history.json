@@ -1,25 +1,73 @@
 [
   {
-    "timestamp": "2025-11-16T02:34:57.104Z",
-    "balance": 9351.8,
+    "timestamp": "2025-11-17T03:30:49.448Z",
+    "balance": 9251.76,
     "ticket": null,
     "profit": null
   },
   {
-    "timestamp": "2025-11-16T02:34:57.106Z",
-    "balance": 9351.8,
+    "timestamp": "2025-11-17T03:30:49.450Z",
+    "balance": 9251.76,
     "ticket": null,
     "profit": null
   },
   {
-    "timestamp": "2025-11-16T02:35:02.113Z",
-    "balance": 9351.8,
+    "timestamp": "2025-11-17T03:30:54.462Z",
+    "balance": 9251.76,
     "ticket": null,
     "profit": null
   },
   {
-    "timestamp": "2025-11-16T02:35:07.115Z",
-    "balance": 9351.8,
+    "timestamp": "2025-11-17T03:30:59.464Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:04.453Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:09.454Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:14.456Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:19.458Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:25.182Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:30.180Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:35.181Z",
+    "balance": 9251.76,
+    "ticket": null,
+    "profit": null
+  },
+  {
+    "timestamp": "2025-11-17T03:31:40.189Z",
+    "balance": 9251.76,
     "ticket": null,
     "profit": null
   }
