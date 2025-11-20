@@ -176,12 +176,12 @@
   },
   "overtradeHistoryReal": [
     {
-      "timestamp": 1763433582318,
+      "timestamp": 1763614600394,
       "type": "manual",
       "data": {
-        "symbol": "BTCUSD",
-        "type": "SELL",
-        "volume": 0.02,
+        "symbol": "UK100.cash",
+        "type": "BUY",
+        "volume": 0.1,
         "stopLoss": 0,
         "takeProfit": 0,
         "action": "executeOrder"
@@ -190,14 +190,14 @@
       "positionType": "open"
     },
     {
-      "timestamp": 1763433583809,
+      "timestamp": 1763614610216,
       "type": "manual",
       "data": {
-        "symbol": "BTCUSD",
-        "type": "SELL",
-        "volume": 0.02,
-        "stopLoss": 0,
-        "takeProfit": 0,
+        "symbol": "UK100.cash",
+        "type": "BUY",
+        "volume": 0.1,
+        "stopLoss": 9480,
+        "takeProfit": 9700,
         "action": "executeOrder"
       },
       "action": "executeOrder",

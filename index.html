@@ -782,7 +782,6 @@
         </div>
         <div class="overtrade-actions">
           <button id="settingsResetTradeCountBtn" class="btn btn-warning">Reset Count</button>
-          <button id="settingsTestOvertradeBtn" class="btn btn-info">Test (Add 5 Trades)</button>
         </div>
         
         <div class="volume-control-section" style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
@@ -883,15 +882,6 @@
           </div>
         </div>
         
-        <div class="twilio-test-section">
-          <h4>🧪 Test</h4>
-          <div class="form-group">
-            <button id="testTwilioBtn" class="btn btn-info btn-small">Send Test Twilio</button>
-            <button id="testTelegramBtn" class="btn btn-info btn-small">Send Test Telegram</button>
-            <div id="twilioTestResult" class="test-result"></div>
-            <div id="telegramTestResult" class="test-result"></div>
-          </div>
-        </div>
       </div>
       
       <!-- AI Analysis Tab -->
@@ -989,15 +979,6 @@
           </div>
         </div>
         
-        <div class="twilio-test-section">
-          <h4>🧪 Test Configurations</h4>
-          <div class="form-group">
-            <button id="testFirecrawlBtn" class="btn btn-info btn-small">Test Firecrawl</button>
-            <button id="testOpenRouterBtn" class="btn btn-info btn-small">Test OpenRouter</button>
-            <button id="testAlphaVantageBtn" class="btn btn-info btn-small">Test Alpha Vantage</button>
-            <div id="aiTestResult" class="test-result"></div>
-          </div>
-        </div>
       </div>
       
       <div class="modal-buttons">
@@ -1033,12 +1014,12 @@
             <span id="confirmTradeCurrentPrice" class="value">Loading...</span>
           </div>
           <div class="confirmation-item">
-            <span class="label">Stop Loss <span style="color: #f44336;">*</span>:</span>
-            <input type="number" id="confirmTradeStopLoss" class="value confirmation-input" step="0.00001" placeholder="Enter stop loss" required>
+            <span class="label">Stop Loss (optional):</span>
+            <input type="number" id="confirmTradeStopLoss" class="value confirmation-input" step="0.00001" placeholder="Enter stop loss (optional)">
           </div>
           <div class="confirmation-item">
-            <span class="label">Take Profit <span style="color: #f44336;">*</span>:</span>
-            <input type="number" id="confirmTradeTakeProfit" class="value confirmation-input" step="0.00001" placeholder="Enter take profit" required>
+            <span class="label">Take Profit (optional):</span>
+            <input type="number" id="confirmTradeTakeProfit" class="value confirmation-input" step="0.00001" placeholder="Enter take profit (optional)">
           </div>
         </div>
         
@@ -1064,6 +1045,47 @@
       <div class="modal-buttons">
         <button onclick="hideTradeConfirmationModal(true)" class="btn btn-secondary">Cancel</button>
         <button onclick="confirmTradeExecution()" class="btn btn-success">✓ Execute Trade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modify Pending Order Modal -->
+  <div id="modifyPendingOrderModal" class="modal">
+    <div class="modal-content trade-confirmation-modal">
+      <h2>📝 Modify Pending Order</h2>
+      
+      <div class="trade-confirmation-modal-content">
+        <div class="trade-confirmation-details">
+          <div class="confirmation-item">
+            <span class="label">Symbol:</span>
+            <span id="modifyPendingOrderSymbol" class="value">-</span>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Ticket:</span>
+            <span id="modifyPendingOrderTicket" class="value">-</span>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Current Limit Price:</span>
+            <span id="modifyPendingOrderCurrentPrice" class="value">-</span>
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Stop Loss (optional):</span>
+            <input type="number" id="modifyPendingOrderStopLoss" class="value confirmation-input" step="0.00001" placeholder="Enter stop loss (leave empty to keep current, 0 to remove)">
+          </div>
+          <div class="confirmation-item">
+            <span class="label">Take Profit (optional):</span>
+            <input type="number" id="modifyPendingOrderTakeProfit" class="value confirmation-input" step="0.00001" placeholder="Enter take profit (leave empty to keep current, 0 to remove)">
+          </div>
+        </div>
+        
+        <div class="confirmation-notice">
+          <p>⚠️ Leave fields empty to keep current values, or enter 0 to remove SL/TP</p>
+        </div>
+      </div>
+      
+      <div class="modal-buttons">
+        <button onclick="hideModifyPendingOrderModal()" class="btn btn-secondary">Cancel</button>
+        <button onclick="confirmModifyPendingOrder()" class="btn btn-success">✓ Modify Order</button>
       </div>
     </div>
   </div>

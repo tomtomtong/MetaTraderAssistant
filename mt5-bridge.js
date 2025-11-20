@@ -3,6 +3,7 @@ const WebSocket = require('ws');
 const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const TwilioAlerts = require('./twilio-alerts');
 
 class MT5Bridge {
   constructor() {
@@ -12,6 +13,45 @@ class MT5Bridge {
     this.messageQueue = new Map();
     this.messageId = 0;
     this.mt5Process = null;
+    this.twilioAlerts = null;
+    this.twilioConfig = {};
+    this.alertConfig = {};
+    this.loadTwilioConfig();
+  }
+  
+  loadTwilioConfig() {
+    /**Load Twilio configuration from unified settings file*/
+    try {
+      const settingsPath = path.join(__dirname, 'app_settings.json');
+      if (fs.existsSync(settingsPath)) {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        const twilioConfig = settings.twilio || {};
+        this.twilioConfig = twilioConfig;
+        this.alertConfig = {
+          recipient_number: twilioConfig.recipientNumber || '',
+          method: twilioConfig.method || 'sms',
+          alerts: twilioConfig.alerts || {}
+        };
+        
+        if (twilioConfig.enabled && twilioConfig.accountSid && twilioConfig.authToken && twilioConfig.fromNumber) {
+          this.twilioAlerts = new TwilioAlerts(
+            twilioConfig.accountSid,
+            twilioConfig.authToken,
+            twilioConfig.fromNumber
+          );
+          console.log("Twilio alerts configured and enabled");
+        } else {
+          console.log("Twilio alerts disabled in configuration");
+          this.twilioAlerts = null;
+        }
+      } else {
+        console.warn("app_settings.json not found. Twilio alerts disabled.");
+        this.twilioConfig = {};
+      }
+    } catch (error) {
+      console.error(`Error loading Twilio config: ${error}`);
+      this.twilioConfig = {};
+    }
   }
 
   launchMT5() {
@@ -231,6 +271,21 @@ class MT5Bridge {
     return response.data;
   }
 
+  async modifyPendingOrder(ticket, stopLoss, takeProfit, price) {
+    if (!this.connected) {
+      throw new Error('Not connected to MT5');
+    }
+
+    console.log('Modifying pending order:', ticket, 'SL:', stopLoss, 'TP:', takeProfit, 'Price:', price);
+    const response = await this.sendMessage('modifyPendingOrder', {
+      ticket,
+      stopLoss,
+      takeProfit,
+      price
+    });
+    return response.data;
+  }
+
   async closePosition(ticket) {
     if (!this.connected) {
       throw new Error('Not connected to MT5');
@@ -389,38 +444,104 @@ class MT5Bridge {
   }
 
   async sendTwilioAlert(alertData) {
-    if (!this.connected) {
-      throw new Error('Not connected to MT5');
-    }
-
+    // Twilio alerts work independently of MT5 connection
     console.log('Sending Twilio alert:', alertData);
-    const response = await this.sendMessage('sendTwilioAlert', {
-      message: alertData.message,
-      toNumber: alertData.toNumber,
-      method: alertData.method || 'sms'
-    });
-
-    return response.data;
+    
+    if (!this.twilioAlerts || !this.twilioAlerts.isEnabled()) {
+      return { success: false, error: "Twilio not configured" };
+    }
+    
+    const toNumber = alertData.toNumber || this.alertConfig.recipient_number;
+    if (!toNumber) {
+      return { success: false, error: "No recipient number provided" };
+    }
+    
+    const method = alertData.method || this.alertConfig.method || 'sms';
+    const message = alertData.message || '';
+    
+    try {
+      const result = await this.twilioAlerts.sendCustomAlert(message, toNumber, method);
+      return result;
+    } catch (error) {
+      console.error('Error sending Twilio alert:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   async getTwilioConfig() {
-    if (!this.connected) {
-      throw new Error('Not connected to MT5');
-    }
-
+    // Twilio config works independently of MT5 connection
     console.log('Getting Twilio config...');
-    const response = await this.sendMessage('getTwilioConfig', {});
-    return response.data;
+    
+    return {
+      enabled: this.twilioAlerts !== null && this.twilioAlerts.isEnabled(),
+      config: this.alertConfig,
+      twilioConfig: {
+        enabled: this.twilioConfig.enabled || false,
+        accountSid: this.twilioConfig.accountSid || '',
+        authToken: this.twilioConfig.authToken ? '***' + this.twilioConfig.authToken.slice(-4) : '',
+        fromNumber: this.twilioConfig.fromNumber || '',
+        recipientNumber: this.twilioConfig.recipientNumber || '',
+        method: this.twilioConfig.method || 'sms',
+        alerts: this.twilioConfig.alerts || {}
+      }
+    };
   }
 
   async updateTwilioConfig(configData) {
-    if (!this.connected) {
-      throw new Error('Not connected to MT5');
-    }
-
+    // Twilio config works independently of MT5 connection
     console.log('Updating Twilio config...');
-    const response = await this.sendMessage('updateTwilioConfig', { config: configData });
-    return response.data;
+    
+    try {
+      const settingsPath = path.join(__dirname, 'app_settings.json');
+      let currentConfig = {};
+      
+      if (fs.existsSync(settingsPath)) {
+        currentConfig = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      }
+      
+      // Ensure twilio section exists
+      if (!currentConfig.twilio) {
+        currentConfig.twilio = {};
+      }
+      
+      // Update with new data
+      if (configData.twilio) {
+        const twilioData = configData.twilio;
+        currentConfig.twilio.enabled = twilioData.enabled !== undefined ? twilioData.enabled : currentConfig.twilio.enabled;
+        currentConfig.twilio.accountSid = twilioData.accountSid || twilioData.account_sid || currentConfig.twilio.accountSid || '';
+        currentConfig.twilio.authToken = twilioData.authToken || twilioData.auth_token || currentConfig.twilio.authToken || '';
+        currentConfig.twilio.fromNumber = twilioData.fromNumber || twilioData.from_number || currentConfig.twilio.fromNumber || '';
+      }
+      
+      if (configData.notifications) {
+        const notificationsData = configData.notifications;
+        currentConfig.twilio.recipientNumber = notificationsData.recipient_number || notificationsData.recipientNumber || currentConfig.twilio.recipientNumber || '';
+        currentConfig.twilio.method = notificationsData.method || currentConfig.twilio.method || 'sms';
+        currentConfig.twilio.alerts = notificationsData.alerts || currentConfig.twilio.alerts || {};
+      }
+      
+      // Also handle direct twilio config updates
+      if (configData.recipientNumber !== undefined) {
+        currentConfig.twilio.recipientNumber = configData.recipientNumber;
+      }
+      if (configData.method !== undefined) {
+        currentConfig.twilio.method = configData.method;
+      }
+      if (configData.alerts !== undefined) {
+        currentConfig.twilio.alerts = configData.alerts;
+      }
+      
+      // Save updated config
+      fs.writeFileSync(settingsPath, JSON.stringify(currentConfig, null, 2), 'utf8');
+      
+      // Reload configuration
+      this.loadTwilioConfig();
+      
+      return { success: true, message: "Twilio configuration updated" };
+    } catch (error) {
+      console.error(`Error updating Twilio config: ${error}`);
+      return { success: false, error: error.message };
+    }
   }
 
   async getClosedPositions(daysBack = 7) {

@@ -1750,12 +1750,21 @@ class NodeEditor {
           // Execute the actual trade
           if (window.mt5API) {
             try {
+              // Convert values to numbers (they might be strings from input fields)
+              const volume = parseFloat(node.params.volume) || 0;
+              const stopLoss = node.params.stopLoss === '' || node.params.stopLoss === null || node.params.stopLoss === undefined 
+                ? 0 
+                : (parseFloat(node.params.stopLoss) || 0);
+              const takeProfit = node.params.takeProfit === '' || node.params.takeProfit === null || node.params.takeProfit === undefined 
+                ? 0 
+                : (parseFloat(node.params.takeProfit) || 0);
+              
               const orderData = {
                 symbol: node.params.symbol,
                 type: node.params.action,
-                volume: node.params.volume,
-                stopLoss: node.params.stopLoss || 0,
-                takeProfit: node.params.takeProfit || 0
+                volume: volume,
+                stopLoss: stopLoss,
+                takeProfit: takeProfit
               };
 
               // Check overtrade control before executing
@@ -1955,7 +1964,7 @@ class NodeEditor {
               }
             }
 
-            // Send the alert via MT5 bridge
+            // Send the alert via MT5 bridge (works independently of MT5 connection)
             if (window.mt5API && window.mt5API.sendTwilioAlert) {
               const alertResult = await window.mt5API.sendTwilioAlert({
                 message: alertMessage,
@@ -1963,14 +1972,16 @@ class NodeEditor {
                 method: node.params.method || 'sms'
               });
 
-              if (alertResult.success && alertResult.data && alertResult.data.success) {
+              // Handle response format: result from IPC is { success: true, data: { success: true/false, ... } }
+              const twilioResult = alertResult.data || alertResult;
+              if (alertResult.success && twilioResult && twilioResult.success) {
                 if (window.showMessage) {
                   window.showMessage('Twilio alert sent successfully', 'success');
                 }
               } else {
-                console.error('✗ Twilio alert failed via node:', alertResult.data?.error || alertResult.error);
+                console.error('✗ Twilio alert failed via node:', twilioResult?.error || alertResult.error);
                 if (window.showMessage) {
-                  window.showMessage(`Twilio alert failed: ${alertResult.data?.error || alertResult.error}`, 'error');
+                  window.showMessage(`Twilio alert failed: ${twilioResult?.error || alertResult.error || 'Unknown error'}`, 'error');
                 }
                 // Don't stop flow on alert failure
               }

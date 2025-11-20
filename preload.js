@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('mt5API', {
   getPositions: () => ipcRenderer.invoke('mt5:getPositions'),
   getPendingOrders: () => ipcRenderer.invoke('mt5:getPendingOrders'),
   cancelPendingOrder: (ticket) => ipcRenderer.invoke('mt5:cancelPendingOrder', ticket),
+  modifyPendingOrder: (ticket, stopLoss, takeProfit, price) => ipcRenderer.invoke('mt5:modifyPendingOrder', { ticket, stopLoss, takeProfit, price }),
   closePosition: (ticket) => ipcRenderer.invoke('mt5:closePosition', ticket),
   modifyPosition: (ticket, stopLoss, takeProfit) => ipcRenderer.invoke('mt5:modifyPosition', { ticket, stopLoss, takeProfit }),
   executeNodeStrategy: (nodeGraph) => ipcRenderer.invoke('mt5:executeNodeStrategy', nodeGraph),

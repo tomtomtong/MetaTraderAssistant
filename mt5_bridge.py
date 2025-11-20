@@ -9,7 +9,6 @@ import asyncio
 import websockets
 import logging
 from datetime import datetime
-from twilio_alerts import TwilioAlerts
 from simulator import TradingSimulator
 import yfinance as yf
 import requests
@@ -23,46 +22,34 @@ class MT5Bridge:
         self.port = port
         self.connected_to_mt5 = False
         self.websocket = None
-        self.twilio_alerts = None
         self.twilio_config = {}
         self.alert_config = {}
-        self.monitored_positions = {}  # Track positions for TP/SL alerts
+        self.monitored_positions = {}  # Track positions for TP/SL alerts (alerts handled by Node.js)
         self.simulator_mode = False  # Simulator mode flag
         self.simulator = TradingSimulator()  # Simulator instance
         self.load_twilio_config()
         self.load_simulator_mode()
     
     def load_twilio_config(self):
-        """Load Twilio configuration from unified settings file"""
+        """Load Twilio configuration from unified settings file (for reference only - alerts handled by Node.js)"""
         try:
             with open('app_settings.json', 'r') as f:
                 settings = json.load(f)
                 twilio_config = settings.get('twilio', {})
                 self.twilio_config = twilio_config  # Store for later retrieval
                 self.alert_config = settings.get('notifications', {})
-            
-            if twilio_config.get('enabled', False):
-                self.twilio_alerts = TwilioAlerts(
-                    account_sid=twilio_config.get('account_sid'),
-                    auth_token=twilio_config.get('auth_token'),
-                    from_number=twilio_config.get('from_number')
-                )
-                logger.info("Twilio alerts configured and enabled")
-            else:
-                logger.info("Twilio alerts disabled in configuration")
-                
+            logger.info("Twilio config loaded (alerts handled by Node.js bridge)")
         except FileNotFoundError:
-            logger.warning("app_settings.json not found. Twilio alerts disabled.")
+            logger.warning("app_settings.json not found.")
             self.twilio_config = {}
         except Exception as e:
             logger.error(f"Error loading Twilio config: {e}")
             self.twilio_config = {}
     
     def update_position_monitoring(self):
-        """Update monitored positions and check for TP/SL hits"""
-        if not self.twilio_alerts or not self.twilio_alerts.is_enabled():
-            return
-        
+        """Update monitored positions (TP/SL alerts handled by Node.js bridge)"""
+        # Position monitoring kept for potential future use
+        # Twilio alerts are now handled by the Node.js bridge
         try:
             current_positions = self.get_positions()
             if isinstance(current_positions, dict) and 'error' in current_positions:
@@ -71,64 +58,13 @@ class MT5Bridge:
             current_tickets = {pos['ticket'] for pos in current_positions}
             previous_tickets = set(self.monitored_positions.keys())
             
-            # Check for closed positions (potential TP/SL hits)
-            closed_tickets = previous_tickets - current_tickets
-            
-            for ticket in closed_tickets:
-                old_position = self.monitored_positions[ticket]
-                self.check_tp_sl_hit(old_position)
-                del self.monitored_positions[ticket]
-            
-            # Update monitored positions
+            # Update monitored positions (alerts handled by Node.js)
             for position in current_positions:
                 ticket = position['ticket']
                 self.monitored_positions[ticket] = position
                 
         except Exception as e:
             logger.error(f"Error updating position monitoring: {e}")
-    
-    def check_tp_sl_hit(self, position):
-        """Check if position was closed due to TP or SL hit"""
-        if not self.alert_config.get('alerts', {}).get('take_profit', False) and \
-           not self.alert_config.get('alerts', {}).get('stop_loss', False):
-            return
-        
-        try:
-            symbol = position['symbol']
-            current_price = position['current_price']
-            take_profit = position.get('take_profit', 0)
-            stop_loss = position.get('stop_loss', 0)
-            order_type = position['type']
-            recipient = self.alert_config.get('recipient_number')
-            method = self.alert_config.get('method', 'sms')
-            
-            if not recipient:
-                return
-            
-            # Determine if TP or SL was hit based on price proximity
-            tp_hit = False
-            sl_hit = False
-            
-            if take_profit > 0:
-                if order_type == 'BUY' and current_price >= take_profit:
-                    tp_hit = True
-                elif order_type == 'SELL' and current_price <= take_profit:
-                    tp_hit = True
-            
-            if stop_loss > 0:
-                if order_type == 'BUY' and current_price <= stop_loss:
-                    sl_hit = True
-                elif order_type == 'SELL' and current_price >= stop_loss:
-                    sl_hit = True
-            
-            # Send appropriate alert
-            if tp_hit and self.alert_config.get('alerts', {}).get('take_profit', False):
-                self.twilio_alerts.send_take_profit_alert(position, recipient, method)
-            elif sl_hit and self.alert_config.get('alerts', {}).get('stop_loss', False):
-                self.twilio_alerts.send_stop_loss_alert(position, recipient, method)
-                
-        except Exception as e:
-            logger.error(f"Error checking TP/SL hit: {e}")
         
     def connect_mt5(self, login=None, password=None, server=None):
         """Connect to MetaTrader 5"""
@@ -359,6 +295,68 @@ class MT5Bridge:
             "message": "Pending order cancelled successfully"
         }
     
+    def modify_pending_order(self, ticket, sl=None, tp=None, price=None):
+        """Modify stop loss, take profit, or price of a pending order"""
+        if not self.connected_to_mt5:
+            return {"success": False, "error": "Not connected to MT5"}
+        
+        # Get the existing order to retrieve current values
+        orders = mt5.orders_get(ticket=ticket)
+        if orders is None or len(orders) == 0:
+            return {"success": False, "error": "Pending order not found"}
+        
+        order = orders[0]
+        
+        # Use existing values if not provided, allow 0 to remove SL/TP
+        new_sl = order.sl if sl is None else float(sl)
+        new_tp = order.tp if tp is None else float(tp)
+        new_price = order.price_open if price is None else float(price)
+        
+        # Get symbol info for validation
+        symbol_info = mt5.symbol_info(order.symbol)
+        if symbol_info is None:
+            return {"success": False, "error": f"Symbol {order.symbol} not found"}
+        
+        # Normalize prices to symbol's tick size
+        tick_size = symbol_info.trade_tick_size
+        if tick_size > 0:
+            new_price = round(new_price / tick_size) * tick_size
+            if new_sl > 0:
+                new_sl = round(new_sl / tick_size) * tick_size
+            if new_tp > 0:
+                new_tp = round(new_tp / tick_size) * tick_size
+        
+        # Prepare order modification request
+        request = {
+            "action": mt5.TRADE_ACTION_MODIFY,
+            "order": ticket,
+            "price": new_price,
+            "sl": new_sl,
+            "tp": new_tp,
+            "magic": 234000,
+        }
+        
+        logger.info(f"Modifying pending order: ticket={ticket}, price={new_price}, sl={new_sl}, tp={new_tp}")
+        result = mt5.order_send(request)
+        
+        if result is None:
+            logger.error("Order modification returned None")
+            return {"success": False, "error": "Order modification failed - MT5 returned None"}
+        
+        logger.info(f"Order modification result: retcode={result.retcode}, comment={result.comment}")
+        
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            error_msg = f"Order modification failed: {result.comment} (retcode: {result.retcode})"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+        
+        logger.info(f"Pending order modified successfully: ticket={ticket}")
+        return {
+            "success": True,
+            "ticket": ticket,
+            "message": "Pending order modified successfully"
+        }
+    
     def execute_order(self, symbol, order_type, volume, sl=0, tp=0, execution_type='MARKET', limit_price=None):
         """Execute a trading order (real or simulated)"""
         if not self.connected_to_mt5:
@@ -437,10 +435,13 @@ class MT5Bridge:
             }
             
             # Add SL/TP only if specified
-            if sl and sl > 0:
-                request["sl"] = sl
-            if tp and tp > 0:
-                request["tp"] = tp
+            # Convert to float to handle string inputs from JSON
+            sl_float = float(sl) if sl else 0
+            tp_float = float(tp) if tp else 0
+            if sl_float > 0:
+                request["sl"] = sl_float
+            if tp_float > 0:
+                request["tp"] = tp_float
             
             logger.info(f"Sending limit order request: {request}")
             result = mt5.order_send(request)
@@ -484,10 +485,13 @@ class MT5Bridge:
         }
         
         # Add SL/TP only if specified (matching price_UI.py logic)
-        if sl and sl > 0:
-            request["sl"] = sl
-        if tp and tp > 0:
-            request["tp"] = tp
+        # Convert to float to handle string inputs from JSON
+        sl_float = float(sl) if sl else 0
+        tp_float = float(tp) if tp else 0
+        if sl_float > 0:
+            request["sl"] = sl_float
+        if tp_float > 0:
+            request["tp"] = tp_float
         
         logger.info(f"Sending order request: {request}")
         result = mt5.order_send(request)
@@ -1178,9 +1182,14 @@ class MT5Bridge:
             # Build request parameters
             params = {
                 'function': function,
-                'symbol': symbol,
                 'apikey': api_key
             }
+            
+            # NEWS_SENTIMENT uses 'tickers' parameter instead of 'symbol'
+            if function == 'NEWS_SENTIMENT':
+                params['tickers'] = symbol
+            else:
+                params['symbol'] = symbol
             
             # Add interval for intraday functions and technical indicators
             if function in ['TIME_SERIES_INTRADAY', 'TIME_SERIES_INTRADAY_EXTENDED']:
@@ -1334,6 +1343,48 @@ class MT5Bridge:
                 
                 rsi_value = latest_rsi.get('RSI', 'N/A')
                 result_value = f"Date: {latest_date}, RSI: {rsi_value}"
+                
+                return {
+                    "success": True,
+                    "symbol": symbol,
+                    "function": function,
+                    "value": result_value,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            elif function == 'NEWS_SENTIMENT':
+                if 'feed' not in data or not data.get('feed'):
+                    return {"error": f"No news sentiment data available for symbol {symbol}"}
+                
+                feed = data['feed']
+                if not feed or len(feed) == 0:
+                    return {"error": f"No news articles found for symbol {symbol}"}
+                
+                # Get the most recent news items (up to 5)
+                recent_items = feed[:5] if len(feed) > 5 else feed
+                
+                sentiment_summary = []
+                for item in recent_items:
+                    title = item.get('title', 'N/A')
+                    time_published = item.get('time_published', 'N/A')
+                    overall_sentiment = item.get('overall_sentiment_label', 'N/A')
+                    sentiment_score = item.get('overall_sentiment_score', 'N/A')
+                    
+                    # Get ticker-specific sentiment if available
+                    ticker_sentiment = item.get('ticker_sentiment', [])
+                    ticker_info = ""
+                    if ticker_sentiment:
+                        for ticker_data in ticker_sentiment[:1]:  # Show first ticker
+                            ticker_info = f" (Ticker: {ticker_data.get('ticker', 'N/A')}, " \
+                                        f"Relevance: {ticker_data.get('relevance_score', 'N/A')}, " \
+                                        f"Sentiment: {ticker_data.get('ticker_sentiment_label', 'N/A')})"
+                    
+                    sentiment_summary.append(
+                        f"[{time_published}] {title[:60]}... | "
+                        f"Overall: {overall_sentiment} ({sentiment_score}){ticker_info}"
+                    )
+                
+                result_value = f"News Sentiment for {symbol}:\n" + "\n".join(sentiment_summary)
                 
                 return {
                     "success": True,
@@ -1676,6 +1727,15 @@ class MT5Bridge:
                 result = self.cancel_pending_order(data.get('ticket'))
                 response['data'] = result
                 
+            elif action == 'modifyPendingOrder':
+                result = self.modify_pending_order(
+                    data.get('ticket'),
+                    data.get('stopLoss'),
+                    data.get('takeProfit'),
+                    data.get('price')
+                )
+                response['data'] = result
+                
             elif action == 'executeOrder':
                 result = self.execute_order(
                     data.get('symbol'),
@@ -1753,29 +1813,8 @@ class MT5Bridge:
                 response['data'] = result
             
             elif action == 'sendTwilioAlert':
-                message = data.get('message', '')
-                to_number = data.get('toNumber', '')
-                method = data.get('method', 'sms')
-                
-                if self.twilio_alerts and self.twilio_alerts.is_enabled():
-                    result = self.twilio_alerts.send_custom_alert(message, to_number, method)
-                    response['data'] = result
-                else:
-                    response['data'] = {"success": False, "error": "Twilio not configured"}
-            
-            elif action == 'testTwilioConnection':
-                if self.twilio_alerts and self.twilio_alerts.is_enabled():
-                    test_message = "Test message from MT5 Trader"
-                    to_number = data.get('toNumber', self.alert_config.get('recipient_number', ''))
-                    method = data.get('method', 'sms')
-                    
-                    if to_number:
-                        result = self.twilio_alerts.send_custom_alert(test_message, to_number, method)
-                        response['data'] = result
-                    else:
-                        response['data'] = {"success": False, "error": "No recipient number provided"}
-                else:
-                    response['data'] = {"success": False, "error": "Twilio not configured"}
+                # Twilio alerts are handled by Node.js bridge, not Python
+                response['data'] = {"success": False, "error": "Twilio alerts handled by Node.js bridge"}
             
             elif action == 'updateTwilioConfig':
                 config_data = data.get('config', {})
@@ -1783,8 +1822,9 @@ class MT5Bridge:
                 response['data'] = result
             
             elif action == 'getTwilioConfig':
+                # Return config from settings file (actual status handled by Node.js bridge)
                 response['data'] = {
-                    "enabled": self.twilio_alerts is not None and self.twilio_alerts.is_enabled(),
+                    "enabled": self.twilio_config.get('enabled', False),
                     "config": self.alert_config,
                     "twilioConfig": self.twilio_config
                 }

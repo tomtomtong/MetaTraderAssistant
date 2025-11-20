@@ -99,6 +99,15 @@ ipcMain.handle('mt5:cancelPendingOrder', async (event, ticket) => {
     }
 });
 
+ipcMain.handle('mt5:modifyPendingOrder', async (event, { ticket, stopLoss, takeProfit, price }) => {
+    try {
+        const result = await mt5Bridge.modifyPendingOrder(ticket, stopLoss, takeProfit, price);
+        return { success: true, data: result };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.handle('mt5:closePosition', async (event, ticket) => {
     try {
         const result = await mt5Bridge.closePosition(ticket);

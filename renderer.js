@@ -339,6 +339,22 @@ function setupEventListeners() {
     });
   }
 
+  // Modify Pending Order Modal - close on overlay click
+  if (document.getElementById('modifyPendingOrderModal')) {
+    document.getElementById('modifyPendingOrderModal').onclick = (e) => {
+      if (e.target === document.getElementById('modifyPendingOrderModal')) {
+        hideModifyPendingOrderModal();
+      }
+    };
+    
+    // ESC key to close modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('modifyPendingOrderModal').classList.contains('show')) {
+        hideModifyPendingOrderModal();
+      }
+    });
+  }
+
   // Global hotkey for toggling simulator mode (Ctrl+Shift+S)
   // This is registered globally so it works at any time, not just when settings modal is open
   document.addEventListener('keydown', (e) => {
@@ -2178,6 +2194,7 @@ async function handleRefreshPendingOrders() {
               Expires: ${expirationTime}
             </div>
             <div class="position-actions">
+              <button class="btn btn-small btn-primary" onclick="modifyPendingOrder(${order.ticket}, '${order.symbol}', ${order.price}, ${order.stop_loss || 0}, ${order.take_profit || 0})">Modify</button>
               <button class="btn btn-small btn-danger" onclick="cancelPendingOrder(${order.ticket})">Cancel</button>
             </div>
           </div>
@@ -2222,6 +2239,92 @@ async function cancelPendingOrder(ticket) {
 
 // Make cancelPendingOrder globally accessible
 window.cancelPendingOrder = cancelPendingOrder;
+
+// Modify pending order modal state
+let modifyPendingOrderData = null;
+
+function modifyPendingOrder(ticket, symbol, currentPrice, currentSL, currentTP) {
+  modifyPendingOrderData = { ticket, symbol, currentPrice, currentSL, currentTP };
+  showModifyPendingOrderModal();
+}
+
+function showModifyPendingOrderModal() {
+  if (!modifyPendingOrderData) return;
+  
+  const { ticket, symbol, currentPrice, currentSL, currentTP } = modifyPendingOrderData;
+  
+  // Set modal content
+  document.getElementById('modifyPendingOrderSymbol').textContent = symbol;
+  document.getElementById('modifyPendingOrderTicket').textContent = ticket;
+  document.getElementById('modifyPendingOrderCurrentPrice').textContent = currentPrice.toFixed(5);
+  
+  // Set current SL/TP values in inputs
+  const slInput = document.getElementById('modifyPendingOrderStopLoss');
+  const tpInput = document.getElementById('modifyPendingOrderTakeProfit');
+  if (slInput) slInput.value = (currentSL && currentSL > 0) ? currentSL.toFixed(5) : '';
+  if (tpInput) tpInput.value = (currentTP && currentTP > 0) ? currentTP.toFixed(5) : '';
+  
+  // Show modal
+  document.getElementById('modifyPendingOrderModal').classList.add('show');
+}
+
+function hideModifyPendingOrderModal() {
+  document.getElementById('modifyPendingOrderModal').classList.remove('show');
+  modifyPendingOrderData = null;
+}
+
+async function confirmModifyPendingOrder() {
+  if (!modifyPendingOrderData) {
+    showMessage('No pending order data found', 'error');
+    return;
+  }
+  
+  const { ticket, symbol } = modifyPendingOrderData;
+  const slInput = document.getElementById('modifyPendingOrderStopLoss').value.trim();
+  const tpInput = document.getElementById('modifyPendingOrderTakeProfit').value.trim();
+  
+  // Parse values - empty means keep existing, 0 means remove
+  const stopLoss = slInput === '' ? null : (slInput === '0' ? 0 : parseFloat(slInput));
+  const takeProfit = tpInput === '' ? null : (tpInput === '0' ? 0 : parseFloat(tpInput));
+  
+  // Validate that at least one value is being modified
+  if (stopLoss === null && takeProfit === null) {
+    showMessage('Please enter at least one value to modify (SL or TP)', 'error');
+    return;
+  }
+  
+  // Validate values
+  if (stopLoss !== null && (isNaN(stopLoss) || stopLoss < 0)) {
+    showMessage('Invalid stop loss value', 'error');
+    return;
+  }
+  
+  if (takeProfit !== null && (isNaN(takeProfit) || takeProfit < 0)) {
+    showMessage('Invalid take profit value', 'error');
+    return;
+  }
+  
+  hideModifyPendingOrderModal();
+  showMessage('Modifying pending order...', 'info');
+  
+  try {
+    const result = await window.mt5API.modifyPendingOrder(ticket, stopLoss, takeProfit, null);
+    
+    if (result.success && result.data.success) {
+      showMessage('Pending order modified successfully!', 'success');
+      await handleRefreshPendingOrders();
+    } else {
+      showMessage('Failed to modify pending order: ' + (result.data?.error || result.error || 'Unknown error'), 'error');
+    }
+  } catch (error) {
+    showMessage('Error modifying pending order: ' + error.message, 'error');
+  }
+}
+
+// Make functions globally accessible
+window.modifyPendingOrder = modifyPendingOrder;
+window.hideModifyPendingOrderModal = hideModifyPendingOrderModal;
+window.confirmModifyPendingOrder = confirmModifyPendingOrder;
 
 // Update trade journal with position data
 function updateTradeJournalWithPositions(positions = []) {
@@ -2855,12 +2958,9 @@ function updatePercentFromPrice(type) {
 // Make functions globally available
 window.closePosition = closePosition;
 window.showModifyModal = showModifyModal;
-window.testVolumeLossFromNode = testVolumeLossFromNode;
 window.showSignalPopup = showSignalPopup;
 window.updatePriceFromPercent = updatePriceFromPercent;
 window.updatePercentFromPrice = updatePercentFromPrice;
-
-// Price testing function for console debugging
 
 
 // Node editor percentage calculation functions
@@ -3518,6 +3618,7 @@ function updatePropertiesPanel(node) {
               <option value="TIME_SERIES_WEEKLY" ${value === 'TIME_SERIES_WEEKLY' ? 'selected' : ''}>Time Series Weekly</option>
               <option value="TIME_SERIES_MONTHLY" ${value === 'TIME_SERIES_MONTHLY' ? 'selected' : ''}>Time Series Monthly</option>
               <option value="OVERVIEW" ${value === 'OVERVIEW' ? 'selected' : ''}>Company Overview</option>
+              <option value="NEWS_SENTIMENT" ${value === 'NEWS_SENTIMENT' ? 'selected' : ''}>News & Sentiment</option>
               <option value="MACD" ${value === 'MACD' ? 'selected' : ''}>MACD (Technical Indicator)</option>
               <option value="RSI" ${value === 'RSI' ? 'selected' : ''}>RSI (Technical Indicator)</option>
             </select>
@@ -4073,58 +4174,8 @@ function updatePropertiesPanel(node) {
   // Add get current price button for conditional check nodes
   if (node.type === 'conditional-check') {
     actionButtons += `
-      <button class="btn btn-success btn-small" onclick="testConditionalCheck('${node.id}')">
-        🧪 Test Condition
-      </button>
       <button class="btn btn-info btn-small" onclick="getCurrentPriceForNode('${node.id}')">
         Get Current Price
-      </button>
-    `;
-  }
-  
-  // Add test buttons for trade nodes
-  if (node.type === 'trade-signal') {
-    actionButtons += `
-      <button class="btn btn-secondary btn-small" onclick="testVolumeLossFromNode('${node.id}')">
-        Calculate Loss
-      </button>
-    `;
-  }
-  
-
-  
-  // Add test buttons for logic gates
-  if (node.type === 'logic-and' || node.type === 'logic-or') {
-    actionButtons += `
-      <button class="btn btn-info btn-small" onclick="testLogicGate('${node.id}')">
-        🧪 Test Logic
-      </button>
-    `;
-  }
-  
-  // Add test end strategy button for end-strategy nodes
-  if (node.type === 'end-strategy') {
-    actionButtons += `
-      <button class="btn btn-warning btn-small" onclick="testEndStrategy('${node.id}')">
-        Test End Strategy
-      </button>
-    `;
-  }
-  
-  // Add test button for Twilio alert nodes
-  if (node.type === 'twilio-alert') {
-    actionButtons += `
-      <button class="btn btn-info btn-small" onclick="testTwilioAlert('${node.id}')">
-        📱 Test Alert
-      </button>
-    `;
-  }
-  
-  // Add test button for close-position node
-  if (node.type === 'close-position') {
-    actionButtons += `
-      <button class="btn btn-warning btn-small" onclick="testClosePosition('${node.id}')">
-        🧪 Test Close
       </button>
     `;
   }
@@ -4134,18 +4185,6 @@ function updatePropertiesPanel(node) {
     actionButtons += `
       <button class="btn btn-info btn-small" onclick="loadCurrentPositionValues('${node.id}')">
         Load Current Values
-      </button>
-      <button class="btn btn-warning btn-small" onclick="testModifyPosition('${node.id}')">
-        🧪 Test Modify
-      </button>
-    `;
-  }
-  
-  // Add test button for python-script node
-  if (node.type === 'python-script') {
-    actionButtons += `
-      <button class="btn btn-success btn-small" onclick="testPythonScript('${node.id}')">
-        🐍 Run Script
       </button>
     `;
   }
@@ -5070,182 +5109,6 @@ function handleModifyPositionFromAlert() {
   showMessage('Position modification feature coming soon', 'info');
 }
 
-// Test function for volume loss feature using trade node data
-function testVolumeLossFromNode(nodeId) {
-  // Find the trade node by ID
-  const tradeNode = nodeEditor.nodes.find(node => node.id == nodeId);
-  
-  if (!tradeNode || tradeNode.type !== 'trade-signal') {
-    showMessage('Please select a trade node first', 'error');
-    return;
-  }
-  
-  // Get data from the trade node
-  const symbol = tradeNode.params.symbol || '';
-  const volume = parseFloat(tradeNode.params.volume) || 0;
-  const action = tradeNode.params.action || 'BUY';
-  
-  // Validate required data
-  if (!symbol || symbol.length < 6) {
-    showMessage('Please enter a valid symbol in the trade node properties', 'error');
-    return;
-  }
-  
-  if (!volume || volume <= 0) {
-    showMessage('Please enter a valid volume in the trade node properties', 'error');
-    return;
-  }
-  
-  // Get current market data and symbol info for accurate calculation
-  async function calculateAndShowLoss() {
-    try {
-      let currentPrice;
-      
-      // Check if MT5 is connected
-      if (isConnected && window.mt5API) {
-        // Get symbol info for accurate calculation
-        console.log('Attempting to get symbol info for:', symbol);
-        console.log('MT5 connected:', isConnected);
-        console.log('MT5 API available:', !!window.mt5API);
-        
-        try {
-          const symbolInfoResult = await window.mt5API.getSymbolInfo(symbol);
-          
-          console.log('Symbol info result:', symbolInfoResult);
-          
-          if (symbolInfoResult.success && symbolInfoResult.data) {
-            const symbolInfo = symbolInfoResult.data;
-            currentPrice = symbolInfo.bid || symbolInfo.ask;
-            
-            console.log('Symbol info retrieved:', symbolInfo);
-          } else {
-            console.log('Symbol info failed, trying market data...');
-            // Fallback to market data only
-            const marketResult = await window.mt5API.getMarketData(symbol);
-            
-            console.log('Market data result:', marketResult);
-            
-            if (marketResult.success && marketResult.data) {
-              currentPrice = marketResult.data.bid || marketResult.data.ask;
-              console.log('Using market data price:', currentPrice);
-            } else {
-              currentPrice = 1.0850; // Mock data
-              console.log('Using mock data price:', currentPrice);
-            }
-          }
-        } catch (err) {
-          console.error('Error getting symbol info:', err);
-          currentPrice = 1.0850; // Mock data
-          console.log('Using mock data due to error:', currentPrice);
-        }
-      } else {
-        currentPrice = 1.0850; // Mock EURUSD price
-      }
-      
-      if (!currentPrice || currentPrice <= 0) {
-        showMessage('Unable to get current price data', 'error');
-        return;
-      }
-      
-      // Calculate accurate loss using real contract information from MetaTrader
-      let pipValue, pipSize, contractSize;
-      let tickSize, tickValue;
-      
-      // Step 1: Retrieve real contract specifications from MT5
-      if (isConnected && window.mt5API) {
-        try {
-          const symbolInfoResult = await window.mt5API.getSymbolInfo(symbol);
-          
-          console.log('Symbol info result:', symbolInfoResult);
-          
-          if (symbolInfoResult.success && symbolInfoResult.data) {
-            const symbolInfo = symbolInfoResult.data;
-            
-            // Get tick size and tick value from MT5
-            tickSize = symbolInfo.trade_tick_size || symbolInfo.point || 0.00001;
-            tickValue = symbolInfo.trade_tick_value || 1;
-            contractSize = symbolInfo.trade_contract_size || 100000;
-            
-            // Determine pip size based on symbol type
-            const isYenPair = symbol.includes('JPY');
-            pipSize = isYenPair ? 0.01 : 0.0001;
-            
-            // Calculate pip value from tick value
-            // If tick size is 0.00001 (point) and pip is 0.0001, then 1 pip = 10 ticks
-            const ticksPerPip = pipSize / tickSize;
-            pipValue = tickValue * ticksPerPip;
-            
-            console.log('Using real MT5 contract data:');
-            console.log('Tick size:', tickSize);
-            console.log('Tick value per lot:', tickValue);
-            console.log('Pip size:', pipSize);
-            console.log('Ticks per pip:', ticksPerPip);
-            console.log('Pip value per lot:', pipValue);
-            console.log('Contract size:', contractSize);
-          }
-        } catch (err) {
-          console.warn('Failed to get symbol info from MT5, using fallback calculation:', err);
-        }
-      }
-      
-      // Step 2: Fallback calculation if MT5 data is not available
-      if (!pipValue || !pipSize) {
-        const isYenPair = symbol.includes('JPY');
-        
-        if (isYenPair) {
-          pipSize = 0.01;
-          pipValue = (0.01 * 100000) / currentPrice;
-        } else {
-          pipSize = 0.0001;
-          pipValue = (0.0001 * 100000) / currentPrice;
-        }
-        
-        if (symbol.endsWith('USD')) {
-          pipValue = 10;
-        }
-        
-        contractSize = 100000;
-        console.log('Using fallback calculation (MT5 not connected)');
-      }
-      
-      // Step 3: Calculate 1% price decrease in pips
-      const priceChangeInPips = (currentPrice * 0.01) / pipSize;
-      
-      // Step 4: Calculate loss using proper formula
-      // Loss = Number of pips × Pip value × Lot size
-      const totalLoss = priceChangeInPips * pipValue * volume;
-      
-      console.log('Calculation details:');
-      console.log('Current price:', currentPrice);
-      console.log('Pip size:', pipSize);
-      console.log('Pip value for 1 lot:', pipValue);
-      console.log('Contract size:', contractSize);
-      console.log('1% price change in pips:', priceChangeInPips);
-      console.log('Volume (lots):', volume);
-      console.log('Final loss for 1% move:', totalLoss);
-      
-      // Show the popup reminder with trade node data and contract info
-      const contractInfo = {
-        tickSize: tickSize,
-        pipSize: pipSize,
-        tickValue: tickValue,
-        pipValue: pipValue,
-        contractSize: contractSize,
-        ticksPerPip: pipSize / tickSize,
-        priceChangeInPips: priceChangeInPips
-      };
-      showVolumeLossReminder(symbol, volume, currentPrice, totalLoss, contractInfo);
-      
-      showMessage(`Testing volume loss for ${symbol} (${action}) with volume ${volume}`, 'info');
-    } catch (error) {
-      console.error('Error testing volume loss:', error);
-      showMessage('Error testing volume loss: ' + error.message, 'error');
-    }
-  }
-  
-  // Execute the calculation
-  calculateAndShowLoss();
-}
 
 // Get current price for conditional check node
 async function getCurrentPriceForNode(nodeId) {
@@ -5306,167 +5169,8 @@ async function getCurrentPriceForNode(nodeId) {
 window.getCurrentPriceForNode = getCurrentPriceForNode;
 
 
-// Test end strategy function
-function testEndStrategy(nodeId) {
-  const node = nodeEditor.nodes.find(n => n.id == nodeId);
-  if (!node || node.type !== 'end-strategy') {
-    showMessage('Please select an end strategy node first', 'error');
-    return;
-  }
-  
-  // Simulate the end strategy execution
-  console.log('Testing End Strategy node:', node.params.message);
-  
-  if (node.params.stopAllTriggers) {
-    console.log('Would stop all strategy triggers...');
-    showMessage('Test: All triggers would be stopped', 'info');
-  }
-  
-  showMessage(`Test End Strategy: ${node.params.message}`, 'success');
-}
 
-// Test Twilio alert function
-async function testTwilioAlert(nodeId) {
-  const node = nodeEditor.nodes.find(n => n.id == nodeId);
-  if (!node || node.type !== 'twilio-alert') {
-    showMessage('Please select a Twilio alert node first', 'error');
-    return;
-  }
-  
-  if (!isConnected) {
-    showMessage('Please connect to MT5 first to test Twilio alerts', 'error');
-    return;
-  }
-  
-  try {
-    showMessage('Testing Twilio alert...', 'info');
-    
-    // Prepare test message
-    let testMessage = node.params.message || 'Test alert from MT5 Trader node';
-    
-    // Add account info if requested
-    if (node.params.includeAccountInfo) {
-      try {
-        const accountInfo = await window.mt5API.getAccountInfo();
-        if (accountInfo.success && accountInfo.data) {
-          const acc = accountInfo.data;
-          testMessage += `\n\nAccount Info:\nBalance: $${acc.balance}\nEquity: $${acc.equity}\nProfit: $${acc.profit}`;
-        }
-      } catch (error) {
-        console.warn('Could not fetch account info for test alert:', error);
-      }
-    }
-    
-    // Add position info if requested
-    if (node.params.includePositions) {
-      try {
-        const positions = await window.mt5API.getPositions();
-        if (positions.success && positions.data && positions.data.length > 0) {
-          testMessage += `\n\nOpen Positions: ${positions.data.length}`;
-          positions.data.forEach((pos, index) => {
-            if (index < 3) { // Limit to first 3 positions
-              testMessage += `\n${pos.symbol} ${pos.type} ${pos.volume} P/L: $${pos.profit.toFixed(2)}`;
-            }
-          });
-          if (positions.data.length > 3) {
-            testMessage += `\n... and ${positions.data.length - 3} more`;
-          }
-        } else {
-          testMessage += '\n\nNo open positions';
-        }
-      } catch (error) {
-        console.warn('Could not fetch positions for test alert:', error);
-      }
-    }
-    
-    // Send test alert
-    const result = await window.mt5API.sendTwilioAlert({
-      message: testMessage,
-      toNumber: node.params.recipient || '', // Use node-specific recipient or default
-      method: node.params.method || 'sms'
-    });
-    
-    if (result.success && result.data && result.data.success) {
-      showMessage('✓ Test Twilio alert sent successfully! Check your phone.', 'success');
-    } else {
-      showMessage(`✗ Test Twilio alert failed: ${result.data?.error || result.error}`, 'error');
-    }
-  } catch (error) {
-    console.error('Error testing Twilio alert:', error);
-    showMessage(`Test Twilio alert error: ${error.message}`, 'error');
-  }
-}
 
-// Test Python Script function
-async function testPythonScript(nodeId) {
-  const node = nodeEditor.nodes.find(n => n.id == nodeId);
-  if (!node || node.type !== 'python-script') {
-    showMessage('Please select a Python Script node first', 'error');
-    return;
-  }
-  
-  if (!isConnected) {
-    showMessage('Please connect to MT5 first to execute Python scripts', 'error');
-    return;
-  }
-  
-  if (!node.params.script || !node.params.script.trim()) {
-    showMessage('Please enter a Python script first', 'error');
-    return;
-  }
-  
-  try {
-    showMessage('Executing Python script...', 'info');
-    
-    // Get input data if useStringInput is enabled
-    let inputData = '';
-    if (node.params.useStringInput) {
-      // Check if there's a string input connected
-      const stringConnection = nodeEditor.connections.find(c => c.to === node && c.toInput === 1);
-      if (stringConnection) {
-        if (stringConnection.from.type === 'string-input') {
-          inputData = stringConnection.from.params.value || '';
-        } else if (stringConnection.from.type === 'string-output') {
-          inputData = stringConnection.from.stringValue || stringConnection.from.params.displayValue || '';
-        } else if (stringConnection.from.type === 'llm-node') {
-          inputData = stringConnection.from.llmResponse || '';
-        } else if (stringConnection.from.type === 'yfinance-data') {
-          inputData = stringConnection.from.fetchedData || '';
-        } else if (stringConnection.from.type === 'firecrawl-node') {
-          inputData = stringConnection.from.firecrawlData || '';
-        } else if (stringConnection.from.type === 'python-script') {
-          inputData = stringConnection.from.pythonOutput || '';
-        }
-      }
-    }
-    
-    // Execute the script
-    const result = await window.mt5API.executePythonScript({
-      script: node.params.script,
-      inputData: inputData,
-      inputVarName: node.params.inputVarName || 'input_data'
-    });
-    
-    if (result.success && result.data) {
-      node.pythonOutput = result.data.output || '';
-      showMessage(`✓ Python script executed successfully!\nOutput: ${node.pythonOutput}`, 'success');
-      
-      // Update properties panel to show the output
-      updatePropertiesPanel(node);
-    } else {
-      showMessage(`✗ Python script failed: ${result.data?.error || result.error}`, 'error');
-    }
-  } catch (error) {
-    console.error('Error testing Python script:', error);
-    showMessage(`Python script error: ${error.message}`, 'error');
-  }
-}
-
-// Make functions globally available
-
-window.testEndStrategy = testEndStrategy;
-window.testTwilioAlert = testTwilioAlert;
-window.testPythonScript = testPythonScript;
 
 // Plugin Import Handler
 async function handlePluginImport(event) {
@@ -6227,13 +5931,7 @@ async function showSettingsModal() {
   }
 
   document.getElementById('settingsResetTradeCountBtn').onclick = resetTradeCountFromSettings;
-  document.getElementById('settingsTestOvertradeBtn').onclick = testOvertradeFromSettings;
   document.getElementById('addVolumeLimitBtn').onclick = addVolumeLimit;
-  document.getElementById('testTwilioBtn').onclick = testTwilioConnection;
-  document.getElementById('testTelegramBtn').onclick = testTelegramConnection;
-  document.getElementById('testFirecrawlBtn').onclick = testFirecrawlConnection;
-  document.getElementById('testOpenRouterBtn').onclick = testOpenRouterConnection;
-  document.getElementById('testAlphaVantageBtn').onclick = testAlphaVantageConnection;
   
   // Simulator mode event listeners
   document.getElementById('settingsSimulatorMode').onchange = async (e) => {
@@ -6522,12 +6220,6 @@ async function resetTradeCountFromSettings() {
   }
 }
 
-async function testOvertradeFromSettings() {
-  if (window.overtradeControl) {
-    await window.overtradeControl.simulateOpenPositionsForTesting();
-    await updateOvertradeStatusInSettings();
-  }
-}
 
 // Volume Control Settings Functions
 let volumeSymbolInput = null;
@@ -6801,581 +6493,9 @@ async function loadSettingsFromFile(file) {
 
 
 
-// Show test result modal with detailed information
-function showTestResultModal(title, message, isSuccess) {
-  // Create modal if it doesn't exist
-  let modal = document.getElementById('testResultModal');
-  
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'testResultModal';
-    modal.className = 'modal';
-    modal.innerHTML = `
-      <div class="modal-content" style="max-width: 500px;">
-        <h2 id="testResultTitle"></h2>
-        <div id="testResultMessage" style="white-space: pre-wrap; font-family: monospace; background: #1e1e1e; padding: 15px; border-radius: 4px; margin: 15px 0; max-height: 400px; overflow-y: auto;"></div>
-        <div class="modal-buttons">
-          <button id="closeTestResultBtn" class="btn btn-primary">OK</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-    
-    document.getElementById('closeTestResultBtn').addEventListener('click', () => {
-      modal.classList.remove('show');
-    });
-  }
-  
-  // Update content
-  const titleEl = document.getElementById('testResultTitle');
-  const messageEl = document.getElementById('testResultMessage');
-  
-  titleEl.textContent = title;
-  titleEl.style.color = isSuccess ? '#4CAF50' : '#FF5252';
-  messageEl.textContent = message;
-  messageEl.style.color = isSuccess ? '#4CAF50' : '#FF9800';
-  
-  // Show modal
-  modal.classList.add('show');
-}
 
-// Test conditional check evaluation
-window.testConditionalCheck = async function(nodeId) {
-  console.log('=== TEST CONDITIONAL CHECK ===');
-  
-  const node = nodeEditor.nodes.find(n => n.id == nodeId);
-  
-  if (!node || node.type !== 'conditional-check') {
-    showMessage('❌ Invalid node - not a Conditional Check node', 'error');
-    return;
-  }
-  
-  showMessage('🔄 Testing conditional check...', 'info');
-  
-  try {
-    // Check MT5 connection
-    if (!isConnected || !window.mt5API) {
-      showMessage('MT5 not connected - Please connect first', 'error');
-      showTestResultModal('MT5 Connection Error', '❌ MT5 Not Connected!\n\nConditional checks require MT5 connection to get current prices.\n\nPlease connect to MT5 first.', false);
-      return;
-    }
-    
-    // Validate parameters
-    if (!node.params.symbol) {
-      showMessage('No symbol specified', 'error');
-      showTestResultModal('Configuration Error', '❌ No Symbol Specified!\n\nPlease enter a symbol (e.g., EURUSD) in the node properties.', false);
-      return;
-    }
-    
-    // Get current price first
-    let currentPrice = null;
-    let percentageChange = null;
-    
-    try {
-      const marketData = await window.mt5API.getMarketData(node.params.symbol);
-      if (marketData.success && marketData.data) {
-        currentPrice = marketData.data.bid;
-      }
-    } catch (error) {
-      console.error('Error getting market data:', error);
-    }
-    
-    if (!currentPrice) {
-      showMessage('Could not get current price', 'error');
-      showTestResultModal('Price Error', `❌ Could Not Get Current Price!\n\nSymbol: ${node.params.symbol}\n\nPossible causes:\n- Symbol not found in Market Watch\n- Symbol name incorrect\n- Market closed`, false);
-      return;
-    }
-    
-    // Get percentage change if needed
-    if (node.params.usePercentageChange) {
-      try {
-        const changeData = await window.mt5API.getPercentageChange(node.params.symbol, node.params.timeframe || 'M1');
-        if (changeData.success && changeData.data) {
-          percentageChange = changeData.data.percentage_change;
-        }
-      } catch (error) {
-        console.error('Error getting percentage change:', error);
-      }
-      
-      if (percentageChange === null) {
-        showMessage('Could not get percentage change', 'error');
-        showTestResultModal('Data Error', `❌ Could Not Get Percentage Change!\n\nSymbol: ${node.params.symbol}\nTimeframe: ${node.params.timeframe}\n\nPossible causes:\n- Insufficient historical data\n- Invalid timeframe`, false);
-        return;
-      }
-    }
-    
-    // Evaluate the condition
-    console.log('Evaluating condition...');
-    const result = await nodeEditor.evaluateConditional(node);
-    
-    // Build detailed result message
-    let message = '';
-    
-    if (node.params.usePercentageChange) {
-      message = `📊 Percentage Change Check\n\n`;
-      message += `Symbol: ${node.params.symbol}\n`;
-      message += `Timeframe: ${node.params.timeframe}\n`;
-      message += `Current Price: ${currentPrice.toFixed(5)}\n`;
-      message += `Percentage Change: ${percentageChange.toFixed(4)}%\n\n`;
-      message += `Condition: ${percentageChange.toFixed(4)}% ${node.params.operator} ${node.params.percentageChange}%\n\n`;
-    } else {
-      message = `💰 Price Check\n\n`;
-      message += `Symbol: ${node.params.symbol}\n`;
-      message += `Current Price: ${currentPrice.toFixed(5)}\n`;
-      message += `Target Price: ${node.params.price}\n\n`;
-      message += `Condition: ${currentPrice.toFixed(5)} ${node.params.operator} ${node.params.price}\n\n`;
-    }
-    
-    if (result) {
-      message += `✅ CONDITION PASSED!\n\n`;
-      message += `The trigger will continue to the next node.\n`;
-      message += `Connected nodes will be executed.`;
-      
-      showMessage('✅ Condition passed!', 'success');
-      showTestResultModal('Condition Passed ✅', message, true);
-    } else {
-      message += `❌ CONDITION FAILED!\n\n`;
-      message += `The trigger will STOP here.\n`;
-      message += `Connected nodes will NOT be executed.`;
-      
-      showMessage('❌ Condition failed', 'error');
-      showTestResultModal('Condition Failed ❌', message, false);
-    }
-    
-  } catch (error) {
-    console.error('Test conditional error:', error);
-    showMessage(`Error: ${error.message}`, 'error');
-    showTestResultModal('Execution Error', `❌ Unexpected Error!\n\n${error.message}\n\nStack trace:\n${error.stack}`, false);
-  }
-};
 
-// Test logic gate evaluation
-window.testLogicGate = async function(nodeId) {
-  console.log('=== TEST LOGIC GATE ===');
-  
-  const node = nodeEditor.nodes.find(n => n.id == nodeId);
-  
-  if (!node || (node.type !== 'logic-and' && node.type !== 'logic-or')) {
-    showMessage('❌ Invalid node - not a Logic Gate node', 'error');
-    return;
-  }
-  
-  const gateType = node.type === 'logic-and' ? 'AND' : 'OR';
-  showMessage(`🔄 Testing ${gateType} gate...`, 'info');
-  
-  try {
-    // Find incoming connections
-    const incomingConnections = nodeEditor.connections.filter(c => c.to === node);
-    
-    if (incomingConnections.length === 0) {
-      showMessage('No inputs connected', 'warning');
-      showTestResultModal('No Inputs', `⚠️ ${gateType} Gate Has No Inputs!\n\nConnect trigger outputs from other nodes to the two inputs of this ${gateType} gate.\n\nThe ${gateType} gate needs at least 2 inputs to function.`, false);
-      return;
-    }
-    
-    if (incomingConnections.length < 2) {
-      showMessage('Only one input connected', 'warning');
-      showTestResultModal('Incomplete Setup', `⚠️ ${gateType} Gate Has Only 1 Input!\n\nCurrent connections: ${incomingConnections.length}\nRequired: 2\n\nConnect another trigger output to the second input of this ${gateType} gate.`, false);
-      return;
-    }
-    
-    // Show connection info
-    let message = `🔌 ${gateType} Gate Configuration\n\n`;
-    message += `Connected Inputs: ${incomingConnections.length}\n\n`;
-    
-    incomingConnections.forEach((conn, idx) => {
-      message += `Input ${conn.toInput + 1}: ${conn.from.title} (${conn.from.type})\n`;
-    });
-    
-    message += `\n📋 How ${gateType} Gate Works:\n\n`;
-    
-    if (node.type === 'logic-and') {
-      message += `AND Gate: ALL inputs must be TRUE\n`;
-      message += `• If Input1 = TRUE and Input2 = TRUE → Output = TRUE ✅\n`;
-      message += `• If Input1 = TRUE and Input2 = FALSE → Output = FALSE ❌\n`;
-      message += `• If Input1 = FALSE and Input2 = TRUE → Output = FALSE ❌\n`;
-      message += `• If Input1 = FALSE and Input2 = FALSE → Output = FALSE ❌\n\n`;
-      message += `Use Case: Execute trade only if BOTH conditions are met\n`;
-      message += `Example: Price > 1.08 AND RSI < 30`;
-    } else {
-      message += `OR Gate: ANY input can be TRUE\n`;
-      message += `• If Input1 = TRUE and Input2 = TRUE → Output = TRUE ✅\n`;
-      message += `• If Input1 = TRUE and Input2 = FALSE → Output = TRUE ✅\n`;
-      message += `• If Input1 = FALSE and Input2 = TRUE → Output = TRUE ✅\n`;
-      message += `• If Input1 = FALSE and Input2 = FALSE → Output = FALSE ❌\n\n`;
-      message += `Use Case: Execute trade if EITHER condition is met\n`;
-      message += `Example: Price > 1.08 OR Price < 1.06`;
-    }
-    
-    message += `\n\n💡 To test the actual logic:\n`;
-    message += `1. Run your strategy with "Execute Once"\n`;
-    message += `2. Watch the console for logic gate evaluation\n`;
-    message += `3. Check if connected nodes execute based on the result`;
-    
-    showMessage(`${gateType} gate configured with ${incomingConnections.length} inputs`, 'info');
-    showTestResultModal(`${gateType} Gate Info`, message, true);
-    
-  } catch (error) {
-    console.error('Test logic gate error:', error);
-    showMessage(`Error: ${error.message}`, 'error');
-    showTestResultModal('Execution Error', `❌ Unexpected Error!\n\n${error.message}`, false);
-  }
-};
 
-// Test close position execution
-window.testClosePosition = async function(nodeId) {
-  console.log('=== TEST CLOSE POSITION ===');
-  
-  const node = nodeEditor.nodes.find(n => n.id == nodeId);
-  
-  if (!node || node.type !== 'close-position') {
-    showMessage('❌ Invalid node - not a Close Position node', 'error');
-    return;
-  }
-  
-  showMessage('🔄 Testing position closure...', 'info');
-  
-  try {
-    // Check MT5 connection
-    if (!isConnected || !window.mt5API) {
-      showMessage('MT5 not connected - Please connect first', 'error');
-      showTestResultModal('MT5 Connection Error', '❌ MT5 Not Connected!\n\nPlease connect to MT5 first.', false);
-      return;
-    }
-    
-    // Check close type
-    if (node.params.closeType === 'all') {
-      // Close all positions
-      const positions = await window.mt5API.getPositions();
-      
-      if (!positions.success || !positions.data || positions.data.length === 0) {
-        showMessage('No positions to close', 'info');
-        showTestResultModal('No Positions', 'ℹ️ No open positions found to close.', false);
-        return;
-      }
-      
-      let successCount = 0;
-      let failCount = 0;
-      const results = [];
-      
-      for (const position of positions.data) {
-        const result = await window.mt5API.closePosition(position.ticket);
-        if (result.success && result.data.success) {
-          successCount++;
-          results.push(`✅ Closed ticket ${position.ticket}`);
-        } else {
-          failCount++;
-          results.push(`❌ Failed ticket ${position.ticket}: ${result.data?.error || result.error}`);
-        }
-      }
-      
-      const message = `Close All Results:\n\n${results.join('\n')}\n\nSuccess: ${successCount}\nFailed: ${failCount}`;
-      showMessage(`Closed ${successCount}/${positions.data.length} positions`, successCount > 0 ? 'success' : 'error');
-      showTestResultModal('Close All Positions', message, successCount > 0);
-      
-      if (successCount > 0 && window.handleRefreshPositions) {
-        setTimeout(() => window.handleRefreshPositions(), 500);
-      }
-      
-    } else {
-      // Close specific position
-      if (!node.params.ticket) {
-        showMessage('No ticket specified', 'error');
-        showTestResultModal('Configuration Error', '❌ No Ticket Specified!\n\nPlease select a position ticket from the dropdown.', false);
-        return;
-      }
-      
-      const result = await window.mt5API.closePosition(node.params.ticket);
-      
-      if (result.success && result.data.success) {
-        const message = `✅ Position Closed Successfully!\n\nTicket: ${node.params.ticket}`;
-        showMessage(`Position ${node.params.ticket} closed`, 'success');
-        showTestResultModal('Position Closed', message, true);
-        
-        if (window.handleRefreshPositions) {
-          setTimeout(() => window.handleRefreshPositions(), 500);
-        }
-      } else {
-        const message = `❌ Failed to Close Position!\n\nTicket: ${node.params.ticket}\nError: ${result.data?.error || result.error}\n\nPossible causes:\n- Position already closed\n- Invalid ticket number\n- Market closed`;
-        showMessage(`Close failed: ${result.data?.error || result.error}`, 'error');
-        showTestResultModal('Close Failed', message, false);
-      }
-    }
-    
-  } catch (error) {
-    console.error('Test close error:', error);
-    showMessage(`Error: ${error.message}`, 'error');
-    showTestResultModal('Execution Error', `❌ Unexpected Error!\n\n${error.message}`, false);
-  }
-};
-
-// Test modify position execution
-window.testModifyPosition = async function(nodeId) {
-  console.log('=== TEST MODIFY POSITION ===');
-  
-  const node = nodeEditor.nodes.find(n => n.id == nodeId);
-  
-  if (!node || node.type !== 'modify-position') {
-    showMessage('❌ Invalid node - not a Modify Position node', 'error');
-    return;
-  }
-  
-  showMessage('🔄 Testing position modification...', 'info');
-  
-  try {
-    // Check MT5 connection
-    if (!isConnected || !window.mt5API) {
-      showMessage('MT5 not connected - Please connect first', 'error');
-      showTestResultModal('MT5 Connection Error', '❌ MT5 Not Connected!\n\nPlease connect to MT5 first.\n\n💡 Solution: Click "Connect to MT5" button first.', false);
-      return;
-    }
-    
-    // Validate ticket
-    if (!node.params.ticket) {
-      showMessage('No ticket specified', 'error');
-      showTestResultModal('Configuration Error', '❌ No Ticket Specified!\n\nPlease select a position ticket from the dropdown.\n\n💡 Solution: Choose a position from the "Ticket" dropdown in the properties panel.', false);
-      return;
-    }
-    
-    // Get current position info for validation
-    const positions = await window.mt5API.getPositions();
-    if (!positions.success) {
-      showMessage('Failed to get positions', 'error');
-      showTestResultModal('Position Check Failed', '❌ Could not retrieve current positions!\n\nThis might indicate an MT5 connection issue.', false);
-      return;
-    }
-    
-    const currentPosition = positions.data.find(pos => pos.ticket == node.params.ticket);
-    if (!currentPosition) {
-      showMessage('Position not found', 'error');
-      showTestResultModal('Position Not Found', `❌ Position with ticket ${node.params.ticket} not found!\n\nThe position may have been closed or the ticket is invalid.\n\n💡 Solution: Refresh positions and select a valid ticket.`, false);
-      return;
-    }
-    
-    // Validate SL/TP values
-    const stopLoss = parseFloat(node.params.stopLoss) || 0;
-    const takeProfit = parseFloat(node.params.takeProfit) || 0;
-    const currentPrice = currentPosition.price_current;
-    const symbol = currentPosition.symbol;
-    const isBuy = currentPosition.type === 0; // 0 = BUY, 1 = SELL
-    
-    let validationErrors = [];
-    
-    // Validate Stop Loss
-    if (stopLoss > 0) {
-      if (isBuy && stopLoss >= currentPrice) {
-        validationErrors.push(`Stop Loss (${stopLoss}) must be below current price (${currentPrice}) for BUY positions`);
-      } else if (!isBuy && stopLoss <= currentPrice) {
-        validationErrors.push(`Stop Loss (${stopLoss}) must be above current price (${currentPrice}) for SELL positions`);
-      }
-    }
-    
-    // Validate Take Profit
-    if (takeProfit > 0) {
-      if (isBuy && takeProfit <= currentPrice) {
-        validationErrors.push(`Take Profit (${takeProfit}) must be above current price (${currentPrice}) for BUY positions`);
-      } else if (!isBuy && takeProfit >= currentPrice) {
-        validationErrors.push(`Take Profit (${takeProfit}) must be below current price (${currentPrice}) for SELL positions`);
-      }
-    }
-    
-    // Check if both values are zero
-    if (stopLoss === 0 && takeProfit === 0) {
-      validationErrors.push('At least one of Stop Loss or Take Profit must be specified');
-    }
-    
-    if (validationErrors.length > 0) {
-      const errorMessage = `❌ Validation Errors:\n\n${validationErrors.map(err => `• ${err}`).join('\n')}\n\n💡 Current Position Info:\nSymbol: ${symbol}\nType: ${isBuy ? 'BUY' : 'SELL'}\nCurrent Price: ${currentPrice}\nCurrent SL: ${currentPosition.sl || 'None'}\nCurrent TP: ${currentPosition.tp || 'None'}`;
-      showMessage('Validation failed', 'error');
-      showTestResultModal('Validation Failed', errorMessage, false);
-      return;
-    }
-    
-    // Show pre-modification info
-    console.log('Position before modification:', {
-      ticket: currentPosition.ticket,
-      symbol: currentPosition.symbol,
-      type: isBuy ? 'BUY' : 'SELL',
-      volume: currentPosition.volume,
-      currentPrice: currentPrice,
-      currentSL: currentPosition.sl || 'None',
-      currentTP: currentPosition.tp || 'None',
-      newSL: stopLoss || 'None',
-      newTP: takeProfit || 'None'
-    });
-    
-    // Execute modification
-    const result = await window.mt5API.modifyPosition(
-      node.params.ticket,
-      stopLoss,
-      takeProfit
-    );
-    
-    if (result.success && result.data.success) {
-      const message = `✅ Position Modified Successfully!\n\nTicket: ${node.params.ticket}\nSymbol: ${symbol}\nType: ${isBuy ? 'BUY' : 'SELL'}\nVolume: ${currentPosition.volume}\n\nChanges:\nStop Loss: ${currentPosition.sl || 'None'} → ${stopLoss || 'None'}\nTake Profit: ${currentPosition.tp || 'None'} → ${takeProfit || 'None'}\n\n💡 The position has been successfully updated in MT5.`;
-      showMessage(`Position ${node.params.ticket} modified`, 'success');
-      showTestResultModal('Position Modified', message, true);
-      
-      if (window.handleRefreshPositions) {
-        setTimeout(() => window.handleRefreshPositions(), 500);
-      }
-    } else {
-      const errorMsg = result.data?.error || result.error || 'Unknown error';
-      const message = `❌ Failed to Modify Position!\n\nTicket: ${node.params.ticket}\nError: ${errorMsg}\n\nPossible causes:\n• SL/TP values too close to current price\n• Invalid price levels for the symbol\n• Position was closed during modification\n• Insufficient margin for the modification\n• Market is closed\n\n💡 Solutions:\n• Check minimum distance requirements for ${symbol}\n• Verify SL/TP values are reasonable\n• Try again when market is open\n• Refresh positions and try again`;
-      showMessage(`Modify failed: ${errorMsg}`, 'error');
-      showTestResultModal('Modify Failed', message, false);
-    }
-    
-  } catch (error) {
-    console.error('Test modify error:', error);
-    showMessage(`Error: ${error.message}`, 'error');
-    showTestResultModal('Execution Error', `❌ Unexpected Error!\n\n${error.message}\n\n💡 This might be a connection issue or MT5 problem. Try reconnecting to MT5.`, false);
-  }
-};
-
-// Debug function to test Modify Position node execution
-window.testModifyPositionNode = async function(ticketId = null, stopLoss = null, takeProfit = null) {
-  console.log('=== TESTING MODIFY POSITION NODE ===');
-  
-  try {
-    // Check MT5 connection
-    if (!isConnected || !window.mt5API) {
-      console.error('❌ MT5 not connected');
-      showMessage('MT5 not connected - Please connect first', 'error');
-      return;
-    }
-    
-    // Get current positions
-    console.log('📋 Getting current positions...');
-    const positions = await window.mt5API.getPositions();
-    
-    if (!positions.success || !positions.data || positions.data.length === 0) {
-      console.error('❌ No positions available');
-      showMessage('No positions available for testing', 'error');
-      return;
-    }
-    
-    console.log(`✅ Found ${positions.data.length} position(s)`);
-    positions.data.forEach((pos, idx) => {
-      console.log(`  ${idx + 1}. Ticket: ${pos.ticket}, Symbol: ${pos.symbol}, Type: ${pos.type === 0 ? 'BUY' : 'SELL'}, Volume: ${pos.volume}, Price: ${pos.price_current}, SL: ${pos.sl || 'None'}, TP: ${pos.tp || 'None'}`);
-    });
-    
-    // Use provided ticket or first available position
-    const targetPosition = ticketId 
-      ? positions.data.find(pos => pos.ticket == ticketId)
-      : positions.data[0];
-    
-    if (!targetPosition) {
-      console.error(`❌ Position with ticket ${ticketId} not found`);
-      showMessage(`Position ${ticketId} not found`, 'error');
-      return;
-    }
-    
-    console.log(`🎯 Testing with position: ${targetPosition.ticket} (${targetPosition.symbol})`);
-    
-    // Use provided values or calculate reasonable defaults
-    const currentPrice = targetPosition.price_current;
-    const isBuy = targetPosition.type === 0;
-    const symbol = targetPosition.symbol;
-    
-    let testSL = stopLoss;
-    let testTP = takeProfit;
-    
-    // Calculate reasonable test values if not provided
-    if (testSL === null) {
-      // Set SL 50 pips away from current price
-      const pipValue = symbol.includes('JPY') ? 0.01 : 0.0001;
-      testSL = isBuy 
-        ? Math.round((currentPrice - (50 * pipValue)) * 100000) / 100000
-        : Math.round((currentPrice + (50 * pipValue)) * 100000) / 100000;
-    }
-    
-    if (testTP === null) {
-      // Set TP 100 pips away from current price
-      const pipValue = symbol.includes('JPY') ? 0.01 : 0.0001;
-      testTP = isBuy 
-        ? Math.round((currentPrice + (100 * pipValue)) * 100000) / 100000
-        : Math.round((currentPrice - (100 * pipValue)) * 100000) / 100000;
-    }
-    
-    console.log(`📊 Test parameters:`);
-    console.log(`  Ticket: ${targetPosition.ticket}`);
-    console.log(`  Symbol: ${symbol}`);
-    console.log(`  Type: ${isBuy ? 'BUY' : 'SELL'}`);
-    console.log(`  Current Price: ${currentPrice}`);
-    console.log(`  Current SL: ${targetPosition.sl || 'None'}`);
-    console.log(`  Current TP: ${targetPosition.tp || 'None'}`);
-    console.log(`  New SL: ${testSL}`);
-    console.log(`  New TP: ${testTP}`);
-    
-    // Validate values
-    let validationErrors = [];
-    
-    if (testSL > 0) {
-      if (isBuy && testSL >= currentPrice) {
-        validationErrors.push(`Stop Loss (${testSL}) must be below current price (${currentPrice}) for BUY positions`);
-      } else if (!isBuy && testSL <= currentPrice) {
-        validationErrors.push(`Stop Loss (${testSL}) must be above current price (${currentPrice}) for SELL positions`);
-      }
-    }
-    
-    if (testTP > 0) {
-      if (isBuy && testTP <= currentPrice) {
-        validationErrors.push(`Take Profit (${testTP}) must be above current price (${currentPrice}) for BUY positions`);
-      } else if (!isBuy && testTP >= currentPrice) {
-        validationErrors.push(`Take Profit (${testTP}) must be below current price (${currentPrice}) for SELL positions`);
-      }
-    }
-    
-    if (validationErrors.length > 0) {
-      console.error('❌ Validation errors:');
-      validationErrors.forEach(err => console.error(`  • ${err}`));
-      showMessage('Validation failed - check console for details', 'error');
-      return;
-    }
-    
-    console.log('✅ Validation passed, executing modification...');
-    showMessage('🔄 Testing position modification...', 'info');
-    
-    // Execute the modification
-    const result = await window.mt5API.modifyPosition(
-      targetPosition.ticket,
-      testSL,
-      testTP
-    );
-    
-    if (result.success && result.data.success) {
-      console.log('✅ Position modified successfully!');
-      console.log('📊 Modification result:', result.data);
-      showMessage(`Position ${targetPosition.ticket} modified successfully`, 'success');
-      
-      // Refresh positions to show updated values
-      if (window.handleRefreshPositions) {
-        setTimeout(() => window.handleRefreshPositions(), 500);
-      }
-      
-      // Show updated position info
-      setTimeout(async () => {
-        const updatedPositions = await window.mt5API.getPositions();
-        const updatedPosition = updatedPositions.data?.find(pos => pos.ticket == targetPosition.ticket);
-        if (updatedPosition) {
-          console.log('📊 Updated position info:');
-          console.log(`  SL: ${targetPosition.sl || 'None'} → ${updatedPosition.sl || 'None'}`);
-          console.log(`  TP: ${targetPosition.tp || 'None'} → ${updatedPosition.tp || 'None'}`);
-        }
-      }, 1000);
-      
-    } else {
-      const errorMsg = result.data?.error || result.error || 'Unknown error';
-      console.error('❌ Modification failed:', errorMsg);
-      showMessage(`Modification failed: ${errorMsg}`, 'error');
-    }
-    
-  } catch (error) {
-    console.error('❌ Test error:', error);
-    showMessage(`Test error: ${error.message}`, 'error');
-  }
-};
 
 // Debug function to test Open Position node execution
 window.testOpenPositionNode = async function() {
@@ -7461,11 +6581,6 @@ window.testOpenPositionNode = async function() {
   console.log('=== TEST COMPLETE ===');
 };
 
-console.log('Debug functions loaded:');
-console.log('• window.testOpenPositionNode() - Test Open Position node execution');
-console.log('• window.testModifyPositionNode(ticketId, stopLoss, takeProfit) - Test Modify Position node execution');
-console.log('• window.testClosePosition(nodeId) - Test Close Position node execution');
-console.log('• window.testModifyPosition(nodeId) - Test Modify Position node execution');
 
 
 // Debug function to check strategy setup
@@ -7570,20 +6685,6 @@ window.debugStrategy = function() {
 
 console.log('Debug helper loaded. Run window.debugStrategy() to check your strategy setup.');
 
-// Debug function to test connection toggle
-window.testConnectionToggle = function() {
-  console.log('=== CONNECTION TOGGLE TEST ===');
-  console.log('Current connection state:', isConnected);
-  console.log('Button text:', document.getElementById('connectBtn').textContent);
-  console.log('Button class:', document.getElementById('connectBtn').className);
-  console.log('=== END TEST ===');
-  
-  return {
-    isConnected,
-    buttonText: document.getElementById('connectBtn').textContent,
-    buttonClass: document.getElementById('connectBtn').className
-  };
-};
 
 // Twilio Settings Functions
 async function loadTwilioSettings() {
@@ -7724,124 +6825,6 @@ async function saveTwilioSettings() {
   }
 }
 
-async function testTwilioConnection() {
-  const testBtn = document.getElementById('testTwilioBtn');
-  const resultDiv = document.getElementById('twilioTestResult');
-  
-  // Disable button and show loading
-  testBtn.disabled = true;
-  testBtn.textContent = 'Sending...';
-  resultDiv.style.display = 'none';
-  
-  try {
-    const settings = getCurrentTwilioSettings();
-    
-    if (!settings.recipientNumber) {
-      showTwilioTestResult('error', 'Please enter a recipient number first');
-      return;
-    }
-    
-    // Save settings first to ensure they're applied
-    await saveTwilioSettings();
-    
-    // Send test message
-    const response = await window.mt5API.sendTwilioAlert({
-      message: 'Test message from MT5 Trader',
-      toNumber: settings.recipientNumber,
-      method: settings.method
-    });
-    
-    if (response && response.data) {
-      if (response.data.success) {
-        showTwilioTestResult('success', `Test message sent successfully! Check your ${settings.method.toUpperCase()}.`);
-      } else {
-        showTwilioTestResult('error', `Failed to send test message: ${response.data.error}`);
-      }
-    } else {
-      showTwilioTestResult('error', 'No response from server');
-    }
-  } catch (error) {
-    console.error('Error testing Twilio connection:', error);
-    showTwilioTestResult('error', `Error: ${error.message}`);
-  } finally {
-    // Re-enable button
-    testBtn.disabled = false;
-    testBtn.textContent = 'Send Test Twilio';
-  }
-}
-
-function showTwilioTestResult(type, message) {
-  const resultDiv = document.getElementById('twilioTestResult');
-  resultDiv.className = `test-result ${type}`;
-  resultDiv.textContent = message;
-  resultDiv.style.display = 'block';
-  
-  // Hide after 5 seconds
-  setTimeout(() => {
-    resultDiv.style.display = 'none';
-  }, 5000);
-}
-
-async function testTelegramConnection() {
-  const testBtn = document.getElementById('testTelegramBtn');
-  const resultDiv = document.getElementById('telegramTestResult');
-  
-  // Disable button and show loading
-  testBtn.disabled = true;
-  testBtn.textContent = 'Sending...';
-  resultDiv.style.display = 'none';
-  
-  try {
-    const settings = getCurrentTelegramSettings();
-    
-    if (!settings.botToken || !settings.chatId) {
-      showTelegramTestResult('error', 'Please enter bot token and chat ID first');
-      return;
-    }
-    
-    // Save settings first to ensure they're applied
-    await saveTwilioSettings();
-    
-    // Send test message
-    if (window.mt5API && window.mt5API.sendTelegramAlert) {
-      const response = await window.mt5API.sendTelegramAlert({
-        message: 'Test message from MT5 Trader',
-        chatId: settings.chatId
-      });
-      
-      if (response && response.data) {
-        if (response.data.success) {
-          showTelegramTestResult('success', 'Test message sent successfully! Check your Telegram.');
-        } else {
-          showTelegramTestResult('error', `Failed to send test message: ${response.data.error}`);
-        }
-      } else {
-        showTelegramTestResult('error', 'No response from server');
-      }
-    } else {
-      showTelegramTestResult('info', 'Telegram test: Settings saved. Backend API integration pending.');
-    }
-  } catch (error) {
-    console.error('Error testing Telegram connection:', error);
-    showTelegramTestResult('error', `Error: ${error.message}`);
-  } finally {
-    // Re-enable button
-    testBtn.disabled = false;
-    testBtn.textContent = 'Send Test Telegram';
-  }
-}
-
-function showTelegramTestResult(type, message) {
-  const resultDiv = document.getElementById('telegramTestResult');
-  resultDiv.className = `test-result ${type}`;
-  resultDiv.textContent = message;
-  resultDiv.style.display = 'block';
-  
-  // Hide after 5 seconds
-  setTimeout(() => {
-    resultDiv.style.display = 'none';
-  }, 5000);
-}
 
 // Add Twilio settings to the change tracking
 function setupTwilioChangeTracking() {
@@ -7975,154 +6958,6 @@ async function saveAiAnalysisSettings() {
   }
 }
 
-async function testFirecrawlConnection() {
-  const testBtn = document.getElementById('testFirecrawlBtn');
-  const resultDiv = document.getElementById('aiTestResult');
-  
-  testBtn.disabled = true;
-  testBtn.textContent = 'Testing...';
-  
-  try {
-    const apiKey = document.getElementById('settingsFirecrawlApiKey').value;
-    const baseUrl = document.getElementById('settingsFirecrawlBaseUrl').value;
-    
-    if (!apiKey) {
-      showAiTestResult('error', 'Please enter a Firecrawl API key');
-      return;
-    }
-    
-    // Test with a simple scrape request
-    const response = await fetch(`${baseUrl}/v0/scrape`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: 'https://example.com',
-        formats: ['markdown']
-      })
-    });
-    
-    if (response.ok) {
-      showAiTestResult('success', 'Firecrawl connection successful!');
-    } else {
-      const error = await response.text();
-      showAiTestResult('error', `Firecrawl test failed: ${response.status} - ${error}`);
-    }
-    
-  } catch (error) {
-    showAiTestResult('error', `Firecrawl connection error: ${error.message}`);
-  } finally {
-    testBtn.disabled = false;
-    testBtn.textContent = 'Test Firecrawl';
-  }
-}
-
-async function testOpenRouterConnection() {
-  const testBtn = document.getElementById('testOpenRouterBtn');
-  const resultDiv = document.getElementById('aiTestResult');
-  
-  testBtn.disabled = true;
-  testBtn.textContent = 'Testing...';
-  
-  try {
-    const apiKey = document.getElementById('settingsOpenRouterApiKey').value;
-    const baseUrl = document.getElementById('settingsOpenRouterBaseUrl').value;
-    const model = document.getElementById('settingsOpenRouterModel').value;
-    
-    if (!apiKey) {
-      showAiTestResult('error', 'Please enter an OpenRouter API key');
-      return;
-    }
-    
-    // Test with a simple completion request
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'user', content: 'Hello, this is a test message.' }
-        ],
-        max_tokens: 10
-      })
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      showAiTestResult('success', `OpenRouter connection successful! Model: ${model}`);
-    } else {
-      const error = await response.text();
-      showAiTestResult('error', `OpenRouter test failed: ${response.status} - ${error}`);
-    }
-    
-  } catch (error) {
-    showAiTestResult('error', `OpenRouter connection error: ${error.message}`);
-  } finally {
-    testBtn.disabled = false;
-    testBtn.textContent = 'Test OpenRouter';
-  }
-}
-
-async function testAlphaVantageConnection() {
-  const testBtn = document.getElementById('testAlphaVantageBtn');
-  const resultDiv = document.getElementById('aiTestResult');
-  
-  testBtn.disabled = true;
-  testBtn.textContent = 'Testing...';
-  
-  try {
-    const apiKey = document.getElementById('settingsAlphaVantageApiKey').value;
-    const baseUrl = document.getElementById('settingsAlphaVantageBaseUrl').value;
-    
-    if (!apiKey) {
-      showAiTestResult('error', 'Please enter an Alpha Vantage API key');
-      return;
-    }
-    
-    // Test with a simple API call (TIME_SERIES_INTRADAY)
-    const testUrl = `${baseUrl}?function=TIME_SERIES_INTRADAY&symbol=IBM&interval=5min&apikey=${apiKey}`;
-    const response = await fetch(testUrl);
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data['Error Message']) {
-        showAiTestResult('error', `Alpha Vantage error: ${data['Error Message']}`);
-      } else if (data['Note']) {
-        showAiTestResult('warning', `Alpha Vantage note: ${data['Note']}`);
-      } else if (data['Meta Data']) {
-        showAiTestResult('success', 'Alpha Vantage connection successful!');
-      } else {
-        showAiTestResult('success', 'Alpha Vantage connection successful!');
-      }
-    } else {
-      const error = await response.text();
-      showAiTestResult('error', `Alpha Vantage test failed: ${response.status} - ${error}`);
-    }
-    
-  } catch (error) {
-    showAiTestResult('error', `Alpha Vantage connection error: ${error.message}`);
-  } finally {
-    testBtn.disabled = false;
-    testBtn.textContent = 'Test Alpha Vantage';
-  }
-}
-
-function showAiTestResult(type, message) {
-  const resultDiv = document.getElementById('aiTestResult');
-  resultDiv.className = `test-result ${type}`;
-  resultDiv.textContent = message;
-  resultDiv.style.display = 'block';
-  
-  // Hide after 5 seconds
-  setTimeout(() => {
-    resultDiv.style.display = 'none';
-  }, 5000);
-}
 
 // Add AI settings to the change tracking
 function setupAiAnalysisChangeTracking() {
