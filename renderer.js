@@ -1234,13 +1234,13 @@ async function handleExecuteTrade() {
     
     // Get current prices for validation
     try {
-      const marketData = await window.mt5API.getMarketData(symbol);
-      if (marketData && marketData.bid && marketData.ask) {
-        if (type === 'BUY' && limitPrice >= marketData.ask) {
+      const result = await window.mt5API.getMarketData(symbol);
+      if (result.success && result.data && result.data.bid && result.data.ask) {
+        if (type === 'BUY' && limitPrice >= result.data.ask) {
           showMessage('For BUY limit orders, the limit price must be below the current ask price', 'error');
           return;
         }
-        if (type === 'SELL' && limitPrice <= marketData.bid) {
+        if (type === 'SELL' && limitPrice <= result.data.bid) {
           showMessage('For SELL limit orders, the limit price must be above the current bid price', 'error');
           return;
         }
@@ -2248,7 +2248,7 @@ function modifyPendingOrder(ticket, symbol, orderType, currentPrice, currentSL, 
   showModifyPendingOrderModal();
 }
 
-function showModifyPendingOrderModal() {
+async function showModifyPendingOrderModal() {
   if (!modifyPendingOrderData) return;
   
   const { ticket, symbol, orderType, currentPrice, currentSL, currentTP } = modifyPendingOrderData;
@@ -2257,6 +2257,27 @@ function showModifyPendingOrderModal() {
   document.getElementById('modifyPendingOrderSymbol').textContent = symbol;
   document.getElementById('modifyPendingOrderTicket').textContent = ticket;
   document.getElementById('modifyPendingOrderCurrentPrice').textContent = currentPrice.toFixed(5);
+  
+  // Fetch and display current market price
+  const marketPriceElement = document.getElementById('modifyPendingOrderMarketPrice');
+  try {
+    const result = await window.mt5API.getMarketData(symbol);
+    if (result.success && result.data && result.data.bid && result.data.ask) {
+      const isBuyOrder = orderType.includes('BUY');
+      const relevantPrice = isBuyOrder ? result.data.ask : result.data.bid;
+      const priceLabel = isBuyOrder ? 'Ask' : 'Bid';
+      marketPriceElement.textContent = `${relevantPrice.toFixed(5)} (${priceLabel})`;
+      marketPriceElement.style.color = '#4CAF50'; // Green color for market price
+    } else {
+      const errorMsg = result.data?.error || result.error || 'Unable to fetch';
+      marketPriceElement.textContent = errorMsg;
+      marketPriceElement.style.color = '#999';
+    }
+  } catch (error) {
+    console.error('Error fetching market price:', error);
+    marketPriceElement.textContent = 'Error loading';
+    marketPriceElement.style.color = '#999';
+  }
   
   // Set current values in inputs (leave empty to show placeholder)
   const priceInput = document.getElementById('modifyPendingOrderLimitPrice');
@@ -2306,14 +2327,14 @@ async function confirmModifyPendingOrder() {
     
     // Validate limit price against current market prices
     try {
-      const marketData = await window.mt5API.getMarketData(symbol);
-      if (marketData && marketData.bid && marketData.ask) {
+      const result = await window.mt5API.getMarketData(symbol);
+      if (result.success && result.data && result.data.bid && result.data.ask) {
         const isBuyOrder = orderType.includes('BUY');
-        if (isBuyOrder && limitPrice >= marketData.ask) {
+        if (isBuyOrder && limitPrice >= result.data.ask) {
           showMessage('For BUY limit orders, the limit price must be below the current ask price', 'error');
           return;
         }
-        if (!isBuyOrder && limitPrice <= marketData.bid) {
+        if (!isBuyOrder && limitPrice <= result.data.bid) {
           showMessage('For SELL limit orders, the limit price must be above the current bid price', 'error');
           return;
         }
