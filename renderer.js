@@ -2527,27 +2527,29 @@ async function cancelPendingOrder(ticket) {
     return;
   }
 
-  if (!confirm(`Are you sure you want to cancel pending order #${ticket}?`)) {
-    return;
-  }
+  showConfirmation(
+    'Cancel Pending Order',
+    `Are you sure you want to cancel pending order #${ticket}?`,
+    async () => {
+      showMessage('Cancelling pending order...', 'info');
 
-  showMessage('Cancelling pending order...', 'info');
-
-  try {
-    const result = await window.mt5API.cancelPendingOrder(ticket);
-    
-    if (result.success) {
-      showMessage(`Pending order #${ticket} cancelled successfully`, 'success');
-      // Refresh pending orders list
-      await handleRefreshPendingOrders();
-      // Also refresh positions in case the order was executed
-      handleRefreshPositions();
-    } else {
-      showMessage('Failed to cancel order: ' + (result.error || 'Unknown error'), 'error');
+      try {
+        const result = await window.mt5API.cancelPendingOrder(ticket);
+        
+        if (result.success) {
+          showMessage(`Pending order #${ticket} cancelled successfully`, 'success');
+          // Refresh pending orders list
+          await handleRefreshPendingOrders();
+          // Also refresh positions in case the order was executed
+          handleRefreshPositions();
+        } else {
+          showMessage('Failed to cancel order: ' + (result.error || 'Unknown error'), 'error');
+        }
+      } catch (error) {
+        showMessage('Error cancelling order: ' + error.message, 'error');
+      }
     }
-  } catch (error) {
-    showMessage('Error cancelling order: ' + error.message, 'error');
-  }
+  );
 }
 
 // Make cancelPendingOrder globally accessible
