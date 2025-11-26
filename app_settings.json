@@ -148,11 +148,25 @@
     }
   },
   "simulator": {
-    "positions": [],
+    "positions": [
+      {
+        "ticket": 1000000,
+        "symbol": "HK50.cash",
+        "type": "BUY",
+        "volume": 0.01,
+        "open_price": 26104.77,
+        "current_price": 26102.73,
+        "sl": 0,
+        "tp": 0,
+        "profit": -0.002623156557442465,
+        "open_time": "2025-11-26T09:48:30.091642",
+        "comment": "SIMULATOR"
+      }
+    ],
     "closed_positions": [],
-    "next_ticket": 1000000,
+    "next_ticket": 1000001,
     "initial_balance": 10000,
-    "last_updated": "2025-11-12T16:17:38.116130"
+    "last_updated": "2025-11-26T09:49:33.809528"
   },
   "simulatorMode": false,
   "overtradeControlReal": {

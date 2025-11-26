@@ -85,6 +85,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateStrategyButtons(); // Set initial button state
   window.historyImport.checkBacktestMode();
   
+  // Initialize schedule datetime inputs for trade confirmation modal
+  const confirmTradeScheduleDateTime = document.getElementById('confirmTradeScheduleDateTime');
+  if (confirmTradeScheduleDateTime) {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    confirmTradeScheduleDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    confirmTradeScheduleDateTime.addEventListener('change', updateTradeSchedulePreview);
+  }
+  
+  const confirmTradeScheduleDelay = document.getElementById('confirmTradeScheduleDelay');
+  if (confirmTradeScheduleDelay) {
+    confirmTradeScheduleDelay.addEventListener('input', updateTradeScheduleFromDelay);
+  }
+  
+  // Initialize schedule datetime inputs for modify pending order modal
+  const modifyPendingOrderScheduleDateTime = document.getElementById('modifyPendingOrderScheduleDateTime');
+  if (modifyPendingOrderScheduleDateTime) {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    modifyPendingOrderScheduleDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    modifyPendingOrderScheduleDateTime.addEventListener('change', updateModifyPendingOrderSchedulePreview);
+  }
+  
+  const modifyPendingOrderScheduleDelay = document.getElementById('modifyPendingOrderScheduleDelay');
+  if (modifyPendingOrderScheduleDelay) {
+    modifyPendingOrderScheduleDelay.addEventListener('input', updateModifyPendingOrderScheduleFromDelay);
+  }
+  
   // Auto-load all settings on startup with a small delay to ensure all systems are ready
   setTimeout(async () => {
     await loadAllSettingsOnStartup();
@@ -301,6 +339,7 @@ function setupEventListeners() {
   
   // Pending orders controls
   document.getElementById('refreshPendingOrdersBtn').addEventListener('click', handleRefreshPendingOrders);
+  document.getElementById('refreshScheduledActionsBtn').addEventListener('click', updateScheduledActionsDisplay);
   
   // Volume loss calculation
   document.getElementById('tradeVolume').addEventListener('input', calculateVolumeLoss);
@@ -881,7 +920,8 @@ function switchPositionsTab(tabName) {
   const tabIdMap = {
     'open': 'openPositionsTab',
     'pending': 'pendingOrdersTab',
-    'closed': 'closedPositionsTab'
+    'closed': 'closedPositionsTab',
+    'scheduled': 'scheduledActionsTab'
   };
   
   const tabId = tabIdMap[tabName] || `${tabName}PositionsTab`;
@@ -895,6 +935,11 @@ function switchPositionsTab(tabName) {
   // Load closed positions if switching to closed tab
   if (tabName === 'closed') {
     handleRefreshClosedPositions();
+  }
+  
+  // Refresh scheduled actions when switching to scheduled tab
+  if (tabName === 'scheduled') {
+    updateScheduledActionsDisplay();
   }
 }
 
@@ -2237,6 +2282,27 @@ function showTradeConfirmationModal(symbol, type, executionType, limitPrice, vol
   // Store the trade data
   pendingTradeData = { symbol, type, executionType, limitPrice, volume, stopLoss, takeProfit };
   
+  // Reset schedule options
+  const scheduleEnabled = document.getElementById('confirmTradeScheduleEnabled');
+  if (scheduleEnabled) {
+    scheduleEnabled.checked = false;
+    toggleTradeScheduleOptions();
+  }
+  const scheduleDelay = document.getElementById('confirmTradeScheduleDelay');
+  if (scheduleDelay) scheduleDelay.value = '';
+  const scheduleDateTime = document.getElementById('confirmTradeScheduleDateTime');
+  if (scheduleDateTime) {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    scheduleDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    scheduleDateTime.addEventListener('change', updateTradeSchedulePreview);
+  }
+  
   // Update confirmation modal content
   document.getElementById('confirmTradeSymbol').textContent = symbol;
   
@@ -2336,6 +2402,57 @@ async function confirmTradeExecution() {
   // Update pendingTradeData with the values from confirmation modal
   const { symbol, type, executionType, limitPrice, volume } = pendingTradeData;
   const tradeDataToExecute = { symbol, type, executionType, limitPrice, volume, stopLoss, takeProfit };
+  
+  // Check if scheduling is enabled
+  const scheduleEnabled = document.getElementById('confirmTradeScheduleEnabled')?.checked || false;
+  
+  if (scheduleEnabled) {
+    // Schedule for later
+    const scheduleDateTime = document.getElementById('confirmTradeScheduleDateTime')?.value;
+    const scheduleDelay = document.getElementById('confirmTradeScheduleDelay')?.value;
+    
+    let scheduledTime;
+    
+    if (scheduleDelay && scheduleDelay > 0) {
+      // Use delay in minutes
+      scheduledTime = new Date(Date.now() + parseInt(scheduleDelay) * 60 * 1000);
+    } else if (scheduleDateTime) {
+      // Use specific date/time
+      scheduledTime = new Date(scheduleDateTime);
+    } else {
+      showMessage('Please specify either a date/time or delay for scheduling', 'error');
+      return;
+    }
+    
+    // Validate scheduled time is in the future
+    if (scheduledTime <= new Date()) {
+      showMessage('Scheduled time must be in the future', 'error');
+      return;
+    }
+    
+    // Save scheduled order
+    const scheduledId = saveScheduledOrder({
+      symbol,
+      type,
+      executionType: executionType || 'MARKET',
+      limitPrice: limitPrice || null,
+      volume,
+      stopLoss,
+      takeProfit,
+      scheduledTime: scheduledTime.toISOString(),
+      createdAt: new Date().toISOString(),
+      orderType: 'executeOrder'
+    });
+    
+    hideTradeConfirmationModal();
+    showMessage(`Trade scheduled for ${scheduledTime.toLocaleString()}`, 'success');
+    
+    // Update scheduled actions display
+    if (window.updateScheduledActionsDisplay) {
+      window.updateScheduledActionsDisplay();
+    }
+    return;
+  }
   
   hideTradeConfirmationModal();
   
@@ -2607,6 +2724,27 @@ async function showModifyPendingOrderModal() {
   
   const { ticket, symbol, orderType, currentPrice, currentSL, currentTP } = modifyPendingOrderData;
   
+  // Reset schedule options
+  const scheduleEnabled = document.getElementById('modifyPendingOrderScheduleEnabled');
+  if (scheduleEnabled) {
+    scheduleEnabled.checked = false;
+    toggleModifyPendingOrderScheduleOptions();
+  }
+  const scheduleDelay = document.getElementById('modifyPendingOrderScheduleDelay');
+  if (scheduleDelay) scheduleDelay.value = '';
+  const scheduleDateTime = document.getElementById('modifyPendingOrderScheduleDateTime');
+  if (scheduleDateTime) {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    scheduleDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    scheduleDateTime.addEventListener('change', updateModifyPendingOrderSchedulePreview);
+  }
+  
   // Set modal content
   document.getElementById('modifyPendingOrderSymbol').textContent = symbol;
   document.getElementById('modifyPendingOrderTicket').textContent = ticket;
@@ -2727,6 +2865,57 @@ async function confirmModifyPendingOrder() {
     return;
   }
   
+  // Check if scheduling is enabled
+  const scheduleEnabled = document.getElementById('modifyPendingOrderScheduleEnabled')?.checked || false;
+  
+  if (scheduleEnabled) {
+    // Schedule for later
+    const scheduleDateTime = document.getElementById('modifyPendingOrderScheduleDateTime')?.value;
+    const scheduleDelay = document.getElementById('modifyPendingOrderScheduleDelay')?.value;
+    
+    let scheduledTime;
+    
+    if (scheduleDelay && scheduleDelay > 0) {
+      // Use delay in minutes
+      scheduledTime = new Date(Date.now() + parseInt(scheduleDelay) * 60 * 1000);
+    } else if (scheduleDateTime) {
+      // Use specific date/time
+      scheduledTime = new Date(scheduleDateTime);
+    } else {
+      showMessage('Please specify either a date/time or delay for scheduling', 'error');
+      return;
+    }
+    
+    // Validate scheduled time is in the future
+    if (scheduledTime <= new Date()) {
+      showMessage('Scheduled time must be in the future', 'error');
+      return;
+    }
+    
+    // Save scheduled pending order modification
+    const scheduledId = saveScheduledOrder({
+      ticket,
+      symbol,
+      orderType,
+      limitPrice,
+      stopLoss,
+      takeProfit,
+      scheduledTime: scheduledTime.toISOString(),
+      createdAt: new Date().toISOString(),
+      orderType: 'modifyPendingOrder'
+    });
+    
+    hideModifyPendingOrderModal();
+    showMessage(`Pending order modification scheduled for ${scheduledTime.toLocaleString()}`, 'success');
+    
+    // Update scheduled actions display
+    if (window.updateScheduledActionsDisplay) {
+      window.updateScheduledActionsDisplay();
+    }
+    return;
+  }
+  
+  // Execute immediately
   hideModifyPendingOrderModal();
   showMessage('Modifying pending order...', 'info');
   
@@ -3302,9 +3491,9 @@ async function handleModifyPosition() {
     hideModifyModal();
     showMessage(`Position modification scheduled for ${scheduledTime.toLocaleString()}`, 'success');
     
-    // Update scheduled modifications display if it exists
-    if (window.updateScheduledModificationsDisplay) {
-      window.updateScheduledModificationsDisplay();
+    // Update scheduled actions display
+    if (window.updateScheduledActionsDisplay) {
+      window.updateScheduledActionsDisplay();
     }
   } else {
     // Execute immediately
@@ -3426,6 +3615,144 @@ function createModifyModal() {
   }
 }
 
+// Schedule helper functions for trade confirmation modal
+function toggleTradeScheduleOptions() {
+  const scheduleEnabled = document.getElementById('confirmTradeScheduleEnabled')?.checked || false;
+  const scheduleOptions = document.getElementById('confirmTradeScheduleOptions');
+  if (scheduleOptions) {
+    scheduleOptions.style.display = scheduleEnabled ? 'block' : 'none';
+    if (scheduleEnabled) {
+      updateTradeSchedulePreview();
+    } else {
+      const preview = document.getElementById('confirmTradeSchedulePreview');
+      if (preview) preview.style.display = 'none';
+    }
+  }
+}
+
+function updateTradeScheduleFromDelay() {
+  const delayInput = document.getElementById('confirmTradeScheduleDelay');
+  const dateTimeInput = document.getElementById('confirmTradeScheduleDateTime');
+  
+  if (!delayInput || !dateTimeInput) return;
+  
+  const delayMinutes = parseInt(delayInput.value);
+  if (delayMinutes && delayMinutes > 0) {
+    const scheduledTime = new Date(Date.now() + delayMinutes * 60 * 1000);
+    const year = scheduledTime.getFullYear();
+    const month = String(scheduledTime.getMonth() + 1).padStart(2, '0');
+    const day = String(scheduledTime.getDate()).padStart(2, '0');
+    const hours = String(scheduledTime.getHours()).padStart(2, '0');
+    const minutes = String(scheduledTime.getMinutes()).padStart(2, '0');
+    dateTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    updateTradeSchedulePreview();
+  }
+}
+
+function updateTradeSchedulePreview() {
+  const scheduleEnabled = document.getElementById('confirmTradeScheduleEnabled')?.checked || false;
+  if (!scheduleEnabled) return;
+  
+  const scheduleDateTime = document.getElementById('confirmTradeScheduleDateTime')?.value;
+  const scheduleDelay = document.getElementById('confirmTradeScheduleDelay')?.value;
+  const preview = document.getElementById('confirmTradeSchedulePreview');
+  const previewText = document.getElementById('confirmTradeSchedulePreviewText');
+  
+  if (!preview || !previewText) return;
+  
+  let scheduledTime;
+  
+  if (scheduleDelay && scheduleDelay > 0) {
+    scheduledTime = new Date(Date.now() + parseInt(scheduleDelay) * 60 * 1000);
+  } else if (scheduleDateTime) {
+    scheduledTime = new Date(scheduleDateTime);
+  } else {
+    preview.style.display = 'none';
+    return;
+  }
+  
+  if (scheduledTime <= new Date()) {
+    previewText.textContent = '⚠️ Scheduled time must be in the future';
+    preview.style.display = 'block';
+    preview.style.backgroundColor = 'rgba(244, 67, 54, 0.15)';
+    preview.style.color = '#EF5350';
+  } else {
+    previewText.textContent = scheduledTime.toLocaleString();
+    preview.style.display = 'block';
+    preview.style.backgroundColor = 'rgba(33, 150, 243, 0.15)';
+    preview.style.color = '#90CAF9';
+  }
+}
+
+// Schedule helper functions for modify pending order modal
+function toggleModifyPendingOrderScheduleOptions() {
+  const scheduleEnabled = document.getElementById('modifyPendingOrderScheduleEnabled')?.checked || false;
+  const scheduleOptions = document.getElementById('modifyPendingOrderScheduleOptions');
+  if (scheduleOptions) {
+    scheduleOptions.style.display = scheduleEnabled ? 'block' : 'none';
+    if (scheduleEnabled) {
+      updateModifyPendingOrderSchedulePreview();
+    } else {
+      const preview = document.getElementById('modifyPendingOrderSchedulePreview');
+      if (preview) preview.style.display = 'none';
+    }
+  }
+}
+
+function updateModifyPendingOrderScheduleFromDelay() {
+  const delayInput = document.getElementById('modifyPendingOrderScheduleDelay');
+  const dateTimeInput = document.getElementById('modifyPendingOrderScheduleDateTime');
+  
+  if (!delayInput || !dateTimeInput) return;
+  
+  const delayMinutes = parseInt(delayInput.value);
+  if (delayMinutes && delayMinutes > 0) {
+    const scheduledTime = new Date(Date.now() + delayMinutes * 60 * 1000);
+    const year = scheduledTime.getFullYear();
+    const month = String(scheduledTime.getMonth() + 1).padStart(2, '0');
+    const day = String(scheduledTime.getDate()).padStart(2, '0');
+    const hours = String(scheduledTime.getHours()).padStart(2, '0');
+    const minutes = String(scheduledTime.getMinutes()).padStart(2, '0');
+    dateTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    updateModifyPendingOrderSchedulePreview();
+  }
+}
+
+function updateModifyPendingOrderSchedulePreview() {
+  const scheduleEnabled = document.getElementById('modifyPendingOrderScheduleEnabled')?.checked || false;
+  if (!scheduleEnabled) return;
+  
+  const scheduleDateTime = document.getElementById('modifyPendingOrderScheduleDateTime')?.value;
+  const scheduleDelay = document.getElementById('modifyPendingOrderScheduleDelay')?.value;
+  const preview = document.getElementById('modifyPendingOrderSchedulePreview');
+  const previewText = document.getElementById('modifyPendingOrderSchedulePreviewText');
+  
+  if (!preview || !previewText) return;
+  
+  let scheduledTime;
+  
+  if (scheduleDelay && scheduleDelay > 0) {
+    scheduledTime = new Date(Date.now() + parseInt(scheduleDelay) * 60 * 1000);
+  } else if (scheduleDateTime) {
+    scheduledTime = new Date(scheduleDateTime);
+  } else {
+    preview.style.display = 'none';
+    return;
+  }
+  
+  if (scheduledTime <= new Date()) {
+    previewText.textContent = '⚠️ Scheduled time must be in the future';
+    preview.style.display = 'block';
+    preview.style.backgroundColor = 'rgba(244, 67, 54, 0.15)';
+    preview.style.color = '#EF5350';
+  } else {
+    previewText.textContent = scheduledTime.toLocaleString();
+    preview.style.display = 'block';
+    preview.style.backgroundColor = 'rgba(33, 150, 243, 0.15)';
+    preview.style.color = '#90CAF9';
+  }
+}
+
 // Schedule modification helper functions
 function toggleScheduleOptions() {
   const scheduleEnabled = document.getElementById('modifyScheduleEnabled')?.checked || false;
@@ -3495,15 +3822,17 @@ function updateSchedulePreview() {
   }
 }
 
-// Scheduled modifications storage and management
+// Scheduled modifications and orders storage and management
 const SCHEDULED_MODIFICATIONS_KEY = 'scheduledPositionModifications';
+const SCHEDULED_ORDERS_KEY = 'scheduledOrders';
 
 function saveScheduledModification(modification) {
   const scheduled = loadScheduledModifications();
   const id = `mod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   scheduled[id] = {
     ...modification,
-    id
+    id,
+    type: 'modifyPosition'
   };
   localStorage.setItem(SCHEDULED_MODIFICATIONS_KEY, JSON.stringify(scheduled));
   return id;
@@ -3527,6 +3856,39 @@ function removeScheduledModification(id) {
 
 function clearScheduledModifications() {
   localStorage.removeItem(SCHEDULED_MODIFICATIONS_KEY);
+}
+
+// Scheduled orders management
+function saveScheduledOrder(order) {
+  const scheduled = loadScheduledOrders();
+  const id = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  scheduled[id] = {
+    ...order,
+    id,
+    type: order.orderType || 'executeOrder'
+  };
+  localStorage.setItem(SCHEDULED_ORDERS_KEY, JSON.stringify(scheduled));
+  return id;
+}
+
+function loadScheduledOrders() {
+  try {
+    const stored = localStorage.getItem(SCHEDULED_ORDERS_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch (error) {
+    console.error('Error loading scheduled orders:', error);
+    return {};
+  }
+}
+
+function removeScheduledOrder(id) {
+  const scheduled = loadScheduledOrders();
+  delete scheduled[id];
+  localStorage.setItem(SCHEDULED_ORDERS_KEY, JSON.stringify(scheduled));
+}
+
+function clearScheduledOrders() {
+  localStorage.removeItem(SCHEDULED_ORDERS_KEY);
 }
 
 async function executeScheduledModifications() {
@@ -3576,28 +3938,352 @@ async function executeScheduledModifications() {
   }
 }
 
-// Initialize scheduled modifications checker
+async function executeScheduledOrders() {
+  const scheduled = loadScheduledOrders();
+  const now = new Date();
+  const toExecute = [];
+  
+  // Find orders that are due
+  for (const [id, order] of Object.entries(scheduled)) {
+    const scheduledTime = new Date(order.scheduledTime);
+    if (scheduledTime <= now) {
+      toExecute.push({ id, ...order });
+    }
+  }
+  
+  // Execute due orders
+  for (const order of toExecute) {
+    try {
+      if (order.type === 'executeOrder') {
+        console.log(`Executing scheduled order: ${order.symbol} ${order.type} ${order.executionType}`);
+        showMessage(`Executing scheduled order: ${order.symbol} ${order.type}...`, 'info');
+        
+        const orderData = {
+          symbol: order.symbol,
+          type: order.type,
+          executionType: order.executionType || 'MARKET',
+          limitPrice: order.limitPrice || null,
+          volume: order.volume,
+          stopLoss: order.stopLoss || 0,
+          takeProfit: order.takeProfit || 0
+        };
+        
+        const result = await window.mt5API.executeOrder(orderData);
+        
+        if (result.success && result.data.success) {
+          showMessage(`Scheduled order executed successfully! Ticket: ${result.data.ticket}`, 'success');
+          removeScheduledOrder(order.id);
+          
+          // Record the trade
+          if (window.overtradeControl) {
+            const tradeDataToRecord = { 
+              symbol: order.symbol, 
+              type: order.type, 
+              volume: order.volume, 
+              stopLoss: order.stopLoss, 
+              takeProfit: order.takeProfit, 
+              action: 'executeOrder' 
+            };
+            await window.overtradeControl.recordTrade('manual', tradeDataToRecord);
+          }
+          
+          // Refresh positions and account
+          if (window.handleRefreshPositions) {
+            setTimeout(() => handleRefreshPositions(), 1000);
+          }
+          if (window.handleRefreshAccount) {
+            setTimeout(() => handleRefreshAccount(), 1000);
+          }
+        } else {
+          showMessage(`Failed to execute scheduled order: ${result.data?.error || result.error}`, 'error');
+          removeScheduledOrder(order.id);
+        }
+      } else if (order.type === 'modifyPendingOrder') {
+        console.log(`Executing scheduled pending order modification for ticket ${order.ticket}`);
+        showMessage(`Executing scheduled pending order modification for ticket ${order.ticket}...`, 'info');
+        
+        const result = await window.mt5API.modifyPendingOrder(
+          order.ticket,
+          order.stopLoss,
+          order.takeProfit,
+          order.limitPrice
+        );
+        
+        if (result.success && result.data.success) {
+          showMessage(`Scheduled pending order modification executed successfully for ticket ${order.ticket}`, 'success');
+          removeScheduledOrder(order.id);
+          
+          // Refresh pending orders
+          if (window.handleRefreshPendingOrders) {
+            setTimeout(() => handleRefreshPendingOrders(), 1000);
+          }
+        } else {
+          showMessage(`Failed to execute scheduled pending order modification: ${result.data?.error || result.error}`, 'error');
+          removeScheduledOrder(order.id);
+        }
+      }
+    } catch (error) {
+      console.error(`Error executing scheduled order ${order.id}:`, error);
+      showMessage(`Error executing scheduled order: ${error.message}`, 'error');
+      removeScheduledOrder(order.id);
+    }
+  }
+}
+
+// Scheduled Actions Display Manager
+let scheduledActionsUpdateInterval = null;
+
+function formatTimeRemaining(scheduledTime) {
+  const now = new Date();
+  const scheduled = new Date(scheduledTime);
+  const diff = scheduled - now;
+  
+  if (diff <= 0) {
+    return 'Due now';
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  } else if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
+function updateScheduledActionsDisplay() {
+  const scheduledModifications = loadScheduledModifications();
+  const scheduledOrders = loadScheduledOrders();
+  const container = document.getElementById('scheduledActionsList');
+  
+  if (!container) return;
+  
+  // Preserve active element before DOM update to prevent input issues
+  const activeElement = document.activeElement;
+  const activeElementId = activeElement && activeElement.id ? activeElement.id : null;
+  const activeElementValue = activeElement && activeElement.value !== undefined ? activeElement.value : null;
+  const wasInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+  
+  // Combine all scheduled items
+  const allScheduled = [];
+  
+  // Add modifications
+  for (const [id, modification] of Object.entries(scheduledModifications)) {
+    allScheduled.push({
+      id,
+      type: 'modifyPosition',
+      scheduledTime: modification.scheduledTime,
+      createdAt: modification.createdAt,
+      data: modification
+    });
+  }
+  
+  // Add orders
+  for (const [id, order] of Object.entries(scheduledOrders)) {
+    allScheduled.push({
+      id,
+      type: order.orderType || 'executeOrder',
+      scheduledTime: order.scheduledTime,
+      createdAt: order.createdAt,
+      data: order
+    });
+  }
+  
+  // Sort by scheduled time
+  allScheduled.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+  
+  if (allScheduled.length === 0) {
+    container.innerHTML = '<p class="no-data">No scheduled actions</p>';
+  } else {
+    let html = '<div class="scheduled-actions-list">';
+    
+    for (const item of allScheduled) {
+      const scheduledTime = new Date(item.scheduledTime);
+      const timeRemaining = formatTimeRemaining(item.scheduledTime);
+      const isOverdue = scheduledTime <= new Date();
+      
+      let description = '';
+      let icon = '⏰';
+      
+      if (item.type === 'modifyPosition') {
+        icon = '📝';
+        description = `Modify Position #${item.data.ticket}`;
+        if (item.data.stopLoss !== null && item.data.stopLoss !== undefined) {
+          description += ` | SL: ${item.data.stopLoss}`;
+        }
+        if (item.data.takeProfit !== null && item.data.takeProfit !== undefined) {
+          description += ` | TP: ${item.data.takeProfit}`;
+        }
+      } else if (item.type === 'executeOrder') {
+        icon = '📊';
+        description = `${item.data.type} ${item.data.symbol} ${item.data.volume} lot${item.data.volume !== 1 ? 's' : ''}`;
+        if (item.data.executionType === 'LIMIT') {
+          description += ` @ ${item.data.limitPrice}`;
+        }
+        if (item.data.stopLoss) description += ` | SL: ${item.data.stopLoss}`;
+        if (item.data.takeProfit) description += ` | TP: ${item.data.takeProfit}`;
+      } else if (item.type === 'modifyPendingOrder') {
+        icon = '✏️';
+        description = `Modify Pending Order #${item.data.ticket} (${item.data.symbol})`;
+        if (item.data.limitPrice !== null) description += ` | Price: ${item.data.limitPrice}`;
+        if (item.data.stopLoss !== null) description += ` | SL: ${item.data.stopLoss}`;
+        if (item.data.takeProfit !== null) description += ` | TP: ${item.data.takeProfit}`;
+      }
+      
+      html += `
+        <div class="scheduled-action-item ${isOverdue ? 'overdue' : ''}" data-id="${item.id}" data-type="${item.type}">
+          <div class="scheduled-action-header">
+            <span class="scheduled-action-icon">${icon}</span>
+            <span class="scheduled-action-description">${description}</span>
+            <span class="scheduled-action-time ${isOverdue ? 'overdue' : ''}">${timeRemaining}</span>
+          </div>
+          <div class="scheduled-action-details">
+            <span class="scheduled-action-date">Scheduled: ${scheduledTime.toLocaleString()}</span>
+            <button class="btn btn-danger btn-small" onclick="cancelScheduledAction('${item.id}', '${item.type}')" style="margin-left: auto;">Cancel</button>
+          </div>
+        </div>
+      `;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+  }
+  
+  // Restore focus and input state if an input was focused before the update
+  if (wasInputFocused && activeElementId && activeElementValue !== null) {
+    setTimeout(() => {
+      const element = document.getElementById(activeElementId);
+      if (element) {
+        // Ensure element is not disabled
+        if (element.disabled !== undefined) {
+          element.disabled = false;
+        }
+        if (element.readOnly !== undefined) {
+          element.readOnly = false;
+        }
+        // Restore value if it was an input
+        if (element.value !== undefined && activeElementValue !== null) {
+          element.value = activeElementValue;
+        }
+        // Restore focus
+        try {
+          element.focus();
+          // Restore cursor position if possible
+          if (element.setSelectionRange && typeof activeElement.selectionStart === 'number') {
+            const cursorPos = activeElement.selectionStart;
+            element.setSelectionRange(cursorPos, cursorPos);
+          }
+        } catch (e) {
+          // Ignore focus errors (e.g., if element is not visible)
+        }
+      }
+    }, 0);
+  }
+}
+
+function cancelScheduledAction(id, type) {
+  if (!confirm('Are you sure you want to cancel this scheduled action?')) {
+    return;
+  }
+  
+  // Preserve active element before DOM update
+  const activeElement = document.activeElement;
+  const activeElementId = activeElement && activeElement.id ? activeElement.id : null;
+  const activeElementValue = activeElement && activeElement.value !== undefined ? activeElement.value : null;
+  
+  if (type === 'modifyPosition') {
+    removeScheduledModification(id);
+  } else {
+    removeScheduledOrder(id);
+  }
+  
+  updateScheduledActionsDisplay();
+  
+  // Restore focus and value if it was an input field
+  if (activeElementId && activeElementValue !== null) {
+    setTimeout(() => {
+      const element = document.getElementById(activeElementId);
+      if (element) {
+        // Ensure element is not disabled
+        if (element.disabled !== undefined) {
+          element.disabled = false;
+        }
+        if (element.readOnly !== undefined) {
+          element.readOnly = false;
+        }
+        // Restore value if it was an input
+        if (element.value !== undefined && activeElementValue !== null) {
+          element.value = activeElementValue;
+        }
+        // Restore focus if it was an input field
+        if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+          try {
+            element.focus();
+          } catch (e) {
+            // Ignore focus errors (e.g., if element is not visible)
+          }
+        }
+      }
+    }, 0);
+  }
+  
+  showMessage('Scheduled action cancelled', 'success');
+}
+
+// Start auto-update for scheduled actions display
+function startScheduledActionsDisplayUpdater() {
+  if (scheduledActionsUpdateInterval) {
+    clearInterval(scheduledActionsUpdateInterval);
+  }
+  
+  // Update every second to show countdown
+  scheduledActionsUpdateInterval = setInterval(() => {
+    const scheduledTab = document.getElementById('scheduledActionsTab');
+    if (scheduledTab && scheduledTab.classList.contains('active')) {
+      updateScheduledActionsDisplay();
+    }
+  }, 1000);
+}
+
+// Make functions available globally
+window.updateScheduledActionsDisplay = updateScheduledActionsDisplay;
+window.cancelScheduledAction = cancelScheduledAction;
+
+// Initialize scheduled modifications and orders checker
 let scheduledModificationsInterval = null;
 
 function startScheduledModificationsChecker() {
-  // Check every 30 seconds for scheduled modifications
+  // Check every 30 seconds for scheduled modifications and orders
   if (scheduledModificationsInterval) {
     clearInterval(scheduledModificationsInterval);
   }
   
   scheduledModificationsInterval = setInterval(() => {
     executeScheduledModifications();
+    executeScheduledOrders();
   }, 30000); // Check every 30 seconds
   
   // Also check immediately on startup
   executeScheduledModifications();
+  executeScheduledOrders();
 }
 
 // Start the checker when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startScheduledModificationsChecker);
+  document.addEventListener('DOMContentLoaded', () => {
+    startScheduledModificationsChecker();
+    startScheduledActionsDisplayUpdater();
+  });
 } else {
   startScheduledModificationsChecker();
+  startScheduledActionsDisplayUpdater();
 }
 
 // Make functions available globally for debugging
@@ -3606,6 +4292,13 @@ window.scheduledModifications = {
   remove: removeScheduledModification,
   clear: clearScheduledModifications,
   execute: executeScheduledModifications
+};
+
+window.scheduledOrders = {
+  load: loadScheduledOrders,
+  remove: removeScheduledOrder,
+  clear: clearScheduledOrders,
+  execute: executeScheduledOrders
 };
 
 // Percentage calculation functions for modify position

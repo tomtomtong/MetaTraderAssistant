@@ -2,20 +2,20 @@
   "positions": [
     {
       "ticket": 1000000,
-      "symbol": "BTCUSD",
-      "type": "SELL",
+      "symbol": "HK50.cash",
+      "type": "BUY",
       "volume": 0.01,
-      "open_price": 99123.61,
-      "current_price": 99123.76,
-      "sl": 110000,
-      "tp": 90000,
-      "profit": -0.0014999999999417925,
-      "open_time": "2025-11-14T09:22:32.744507",
+      "open_price": 26104.77,
+      "current_price": 26111.53,
+      "sl": 0,
+      "tp": 0,
+      "profit": 0.008692230740149104,
+      "open_time": "2025-11-26T09:48:30.091642",
       "comment": "SIMULATOR"
     }
   ],
   "closed_positions": [],
   "next_ticket": 1000001,
   "initial_balance": 10000,
-  "last_updated": "2025-11-14T09:22:33.886065"
+  "last_updated": "2025-11-26T09:54:05.053714"
 }

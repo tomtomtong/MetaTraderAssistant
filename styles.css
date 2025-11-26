@@ -496,6 +496,79 @@ body.resizing * {
   gap: 10px;
 }
 
+/* Scheduled Actions Styles */
+.scheduled-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+}
+
+.scheduled-action-item {
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 12px;
+  transition: all 0.2s;
+}
+
+.scheduled-action-item:hover {
+  background: #252525;
+  border-color: #64B5F6;
+}
+
+.scheduled-action-item.overdue {
+  border-color: #f44336;
+  background: rgba(244, 67, 54, 0.1);
+}
+
+.scheduled-action-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.scheduled-action-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.scheduled-action-description {
+  flex: 1;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.scheduled-action-time {
+  color: #90CAF9;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 4px 8px;
+  background: rgba(33, 150, 243, 0.2);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.scheduled-action-time.overdue {
+  color: #EF5350;
+  background: rgba(244, 67, 54, 0.2);
+}
+
+.scheduled-action-details {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #888;
+}
+
+.scheduled-action-date {
+  flex: 1;
+}
+
 .filter-controls .form-group {
   display: flex;
   flex-direction: column;
