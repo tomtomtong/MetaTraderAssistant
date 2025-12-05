@@ -1,0 +1,206 @@
+{
+  "openTradingView": false,
+  "ai": {
+    "enabled": true,
+    "firecrawl": {
+      "enabled": true,
+      "apiKey": "fc-835a843fa061413391468b8b2fb877da",
+      "baseUrl": "https://api.firecrawl.dev"
+    },
+    "openRouter": {
+      "enabled": true,
+      "apiKey": "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",
+      "model": "anthropic/claude-3.5-sonnet",
+      "baseUrl": "https://openrouter.ai/api/v1"
+    },
+    "lmStudio": {
+      "enabled": false,
+      "apiKey": "",
+      "model": "",
+      "baseUrl": "http://localhost:1234/v1"
+    },
+    "alphavantage": {
+      "enabled": true,
+      "apiKey": "3TAP1GCIZ5EW1J63",
+      "baseUrl": "https://www.alphavantage.co/query"
+    },
+    "features": {
+      "marketAnalysis": true,
+      "newsAnalysis": true,
+      "strategyOptimization": false,
+      "riskAssessment": true
+    },
+    "savedPrompts": {
+      "bitcoin": "Should I buy or sell bitcoin now?",
+      "default": "You are an investment assistant. Please analyse the data and make guide to me."
+    }
+  },
+  "twilio": {
+    "enabled": true,
+    "accountSid": "",
+    "authToken": "",
+    "fromNumber": "",
+    "recipientNumber": "",
+    "method": "sms",
+    "alerts": {
+      "take_profit": true,
+      "stop_loss": true,
+      "position_opened": false,
+      "position_closed": false
+    }
+  },
+  "telegram": {
+    "enabled": true,
+    "botToken": "",
+    "chatId": "",
+    "alerts": {
+      "take_profit": true,
+      "stop_loss": true,
+      "position_opened": false,
+      "position_closed": false
+    }
+  },
+  "volumeControl": {
+    "enabled": true,
+    "symbolLimits": {
+      "XAUUSD": 0.01,
+      "BTCUSD": 0.01,
+      "ETHUSD": 0.01,
+      "HK50.CASH": 0.5,
+      "JP225.CASH": 0.5
+    },
+    "maxVolume": 1,
+    "warningThreshold": 0.8,
+    "autoReduce": false,
+    "reductionFactor": 0.5
+  },
+  "overtradeControl": {
+    "enabled": true,
+    "maxTradesPerHour": 10,
+    "maxTradesPerDay": 50,
+    "cooldownMinutes": 5,
+    "warningEnabled": true,
+    "blockTrading": false,
+    "maxTrades": 5,
+    "timePeriod": "hour",
+    "reminderFrequency": "first",
+    "applyToManual": true,
+    "applyToStrategy": true,
+    "applyToNodes": true,
+    "applyToOpenPositions": true,
+    "applyToClosePositions": false
+  },
+  "overtradeHistory": [
+    {
+      "timestamp": 1762934193154,
+      "type": "manual",
+      "data": {
+        "symbol": "HK50.cash",
+        "type": "BUY",
+        "volume": 0.5,
+        "stopLoss": 0,
+        "takeProfit": 0,
+        "action": "executeOrder"
+      },
+      "action": "executeOrder",
+      "positionType": "open"
+    },
+    {
+      "timestamp": 1762934199231,
+      "type": "manual",
+      "data": {
+        "symbol": "HK50.cash",
+        "type": "BUY",
+        "volume": 0.5,
+        "stopLoss": 10,
+        "takeProfit": 300000,
+        "action": "executeOrder"
+      },
+      "action": "executeOrder",
+      "positionType": "open"
+    }
+  ],
+  "overtradeLastWarning": 0,
+  "overtradeWarningCount": 0,
+  "ui": {
+    "panelSizes": {
+      "rightSidebarWidth": 357,
+      "bottomPanelHeight": 250
+    },
+    "theme": "dark"
+  },
+  "autoConnectNodes": true,
+  "historicalData": null,
+  "mt5Trading": {
+    "symbol": "BTCUSD",
+    "orderType": "BUY",
+    "condition": "BELOW",
+    "targetPrice": 105000,
+    "volume": 0.01,
+    "checkInterval": 5
+  },
+  "signal": {
+    "enabled": false,
+    "accountSid": "",
+    "authToken": "",
+    "fromNumber": "",
+    "recipientNumber": "",
+    "method": "sms",
+    "alerts": {
+      "take_profit": true,
+      "stop_loss": true,
+      "position_opened": false,
+      "position_closed": false
+    }
+  },
+  "simulator": {
+    "positions": [
+      {
+        "ticket": 1000000,
+        "symbol": "HK50.cash",
+        "type": "BUY",
+        "volume": 0.01,
+        "open_price": 26104.77,
+        "current_price": 26097.03,
+        "sl": 0,
+        "tp": 0,
+        "profit": -0.009943358825503817,
+        "open_time": "2025-11-26T09:48:30.091642",
+        "comment": "SIMULATOR"
+      }
+    ],
+    "closed_positions": [],
+    "next_ticket": 1000001,
+    "initial_balance": 10000,
+    "last_updated": "2025-12-05T16:52:18.717347"
+  },
+  "simulatorMode": false,
+  "overtradeControlReal": {
+    "enabled": true,
+    "maxTrades": 5,
+    "timePeriod": "hour",
+    "reminderFrequency": "first",
+    "applyToManual": true,
+    "applyToStrategy": true,
+    "applyToNodes": true,
+    "applyToOpenPositions": true,
+    "applyToClosePositions": false
+  },
+  "overtradeControlSimulator": {
+    "enabled": true,
+    "maxTrades": 10,
+    "timePeriod": "hour",
+    "reminderFrequency": "first",
+    "applyToManual": true,
+    "applyToStrategy": true,
+    "applyToNodes": true,
+    "applyToOpenPositions": true,
+    "applyToClosePositions": false
+  },
+  "overtradeHistoryReal": [],
+  "overtradeHistorySimulator": [],
+  "overtradeLastWarningReal": 0,
+  "overtradeLastWarningSimulator": 0,
+  "overtradeWarningCountReal": 0,
+  "overtradeWarningCountSimulator": 0
+}
