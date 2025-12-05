@@ -2423,22 +2423,28 @@ class NodeEditor {
           console.log('Processing LLM node with model:', node.params.model);
 
           try {
-            // Get OpenRouter settings from global settings
+            // Get AI settings from global settings - check LM Studio first (local API takes priority)
+            const lmStudioSettings = window.settingsManager ? window.settingsManager.get('ai.lmStudio') : null;
             const openRouterSettings = window.settingsManager ? window.settingsManager.get('ai.openRouter') : null;
+            
+            // Determine which AI service to use (LM Studio takes priority if enabled)
+            const useLmStudio = lmStudioSettings && lmStudioSettings.enabled;
+            const aiSettings = useLmStudio ? lmStudioSettings : openRouterSettings;
+            const serviceName = useLmStudio ? 'LM Studio' : 'OpenRouter';
 
-            if (!openRouterSettings || !openRouterSettings.enabled) {
-              console.error('OpenRouter is not enabled in settings');
+            if (!aiSettings || !aiSettings.enabled) {
+              console.error(`${serviceName} is not enabled in settings`);
               if (window.showMessage) {
-                window.showMessage('OpenRouter is not enabled. Please enable it in settings.', 'error');
+                window.showMessage(`${serviceName} is not enabled. Please enable it in settings.`, 'error');
               }
-              node.llmResponse = 'Error: OpenRouter not enabled';
+              node.llmResponse = `Error: ${serviceName} not enabled`;
               
               // Record error output in memory with timestamp
               if (!node.memory) {
                 node.memory = [];
               }
               node.memory.push({
-                output: 'Error: OpenRouter not enabled',
+                output: `Error: ${serviceName} not enabled`,
                 timestamp: Date.now()
               });
               
@@ -2451,7 +2457,8 @@ class NodeEditor {
               break;
             }
 
-            if (!openRouterSettings.apiKey) {
+            // LM Studio doesn't require API key, but OpenRouter does
+            if (!useLmStudio && !aiSettings.apiKey) {
               console.error('OpenRouter API key not configured');
               if (window.showMessage) {
                 window.showMessage('OpenRouter API key not configured. Please set it in settings.', 'error');
@@ -2537,8 +2544,8 @@ class NodeEditor {
               console.log('LLM prompt (no string inputs):', finalPrompt);
             }
 
-            // Use model from node params or fallback to settings
-            const modelToUse = node.params.model || openRouterSettings.model;
+            // Use model from node params or fallback to settings (LM Studio can work without model)
+            const modelToUse = node.params.model || aiSettings.model || '';
 
             // Call LLM API through MT5 bridge
             if (window.mt5API && window.mt5API.callLLM) {
@@ -2547,8 +2554,8 @@ class NodeEditor {
                 prompt: finalPrompt,
                 maxTokens: node.params.maxTokens,
                 temperature: node.params.temperature,
-                apiKey: openRouterSettings.apiKey,
-                baseUrl: openRouterSettings.baseUrl
+                apiKey: aiSettings.apiKey || (useLmStudio ? 'lm-studio' : ''),
+                baseUrl: aiSettings.baseUrl
               });
 
               if (llmResult.success && llmResult.data) {

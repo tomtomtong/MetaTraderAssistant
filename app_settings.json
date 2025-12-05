@@ -13,6 +13,12 @@
       "model": "anthropic/claude-3.5-sonnet",
       "baseUrl": "https://openrouter.ai/api/v1"
     },
+    "lmStudio": {
+      "enabled": false,
+      "apiKey": "",
+      "model": "",
+      "baseUrl": "http://localhost:1234/v1"
+    },
     "alphavantage": {
       "enabled": true,
       "apiKey": "3TAP1GCIZ5EW1J63",
@@ -191,22 +197,7 @@
     "applyToOpenPositions": true,
     "applyToClosePositions": false
   },
-  "overtradeHistoryReal": [
-    {
-      "timestamp": 1764553090925,
-      "type": "manual",
-      "data": {
-        "symbol": "ETHUSD",
-        "type": "SELL",
-        "volume": 0.01,
-        "stopLoss": 0,
-        "takeProfit": 0,
-        "action": "executeOrder"
-      },
-      "action": "executeOrder",
-      "positionType": "open"
-    }
-  ],
+  "overtradeHistoryReal": [],
   "overtradeHistorySimulator": [],
   "overtradeLastWarningReal": 0,
   "overtradeLastWarningSimulator": 0,

@@ -5073,8 +5073,14 @@ function updatePropertiesPanel(node) {
         `;
 
       } else if (key === 'model' && node.type === 'llm-node') {
+        const lmStudioSettings = window.settingsManager ? window.settingsManager.get('ai.lmStudio') : null;
         const openRouterSettings = window.settingsManager ? window.settingsManager.get('ai.openRouter') : null;
-        const defaultModel = openRouterSettings ? openRouterSettings.model : 'openai/gpt-4o-mini';
+        
+        // Check which service is enabled (LM Studio takes priority)
+        const useLmStudio = lmStudioSettings && lmStudioSettings.enabled;
+        const aiSettings = useLmStudio ? lmStudioSettings : openRouterSettings;
+        const serviceName = useLmStudio ? 'LM Studio' : 'OpenRouter';
+        const defaultModel = aiSettings && aiSettings.model ? aiSettings.model : (useLmStudio ? 'Server Default' : 'openai/gpt-4o-mini');
         
         return `
           <div class="property-item">
@@ -5083,14 +5089,14 @@ function updatePropertiesPanel(node) {
               type="text" 
               data-param="${key}" 
               value="${value || ''}" 
-              placeholder="Enter model name (e.g., openai/gpt-4o-mini)"
+              placeholder="${useLmStudio ? 'Enter model name or leave empty for server default' : 'Enter model name (e.g., openai/gpt-4o-mini)'}"
               onchange="updateNodeParam('${key}', this.value)"
               onblur="updateNodeParam('${key}', this.value)"
               list="llm-model-suggestions-${node.id}"
               style="width: 100%; padding: 6px; margin-top: 4px;"
             />
             <datalist id="llm-model-suggestions-${node.id}">
-              <option value="">Use Settings Default (${defaultModel})</option>
+              <option value="">Use Settings Default${useLmStudio ? ' (Server Default)' : ` (${defaultModel})`}</option>
               <option value="openai/gpt-3.5-turbo">OpenAI GPT-3.5 Turbo</option>
               <option value="openai/gpt-4">OpenAI GPT-4</option>
               <option value="openai/gpt-4-turbo">OpenAI GPT-4 Turbo</option>
@@ -5112,7 +5118,10 @@ function updatePropertiesPanel(node) {
               <option value="perplexity/llama-3.1-sonar-large-128k-online">Perplexity Llama 3.1 Sonar Large</option>
             </datalist>
             <small style="color: #888; font-size: 10px; display: block; margin-top: 4px;">
-              Enter any OpenRouter model name (e.g., openai/gpt-4o-mini) or leave empty to use the default from OpenRouter settings (${defaultModel}).
+              ${useLmStudio 
+                ? `Using ${serviceName}. Enter model name from LM Studio or leave empty to use server default.`
+                : `Enter any ${serviceName} model name (e.g., openai/gpt-4o-mini) or leave empty to use the default from ${serviceName} settings (${defaultModel}).`
+              }
               <br>You can type to see suggestions or enter a custom model name.
             </small>
           </div>
@@ -5210,26 +5219,34 @@ function updatePropertiesPanel(node) {
           </div>
         `;
       } else if (key === 'apiKey' && node.type === 'llm-node') {
+        const lmStudioSettings = window.settingsManager ? window.settingsManager.get('ai.lmStudio') : null;
         const openRouterSettings = window.settingsManager ? window.settingsManager.get('ai.openRouter') : null;
-        const isConfigured = openRouterSettings && openRouterSettings.enabled && openRouterSettings.apiKey;
+        
+        // Check which service is enabled (LM Studio takes priority)
+        const useLmStudio = lmStudioSettings && lmStudioSettings.enabled;
+        const aiSettings = useLmStudio ? lmStudioSettings : openRouterSettings;
+        const serviceName = useLmStudio ? 'LM Studio' : 'OpenRouter';
+        const isConfigured = aiSettings && aiSettings.enabled && (useLmStudio || aiSettings.apiKey);
         
         return `
           <div class="property-item">
             <label>API Configuration:</label>
             <div style="padding: 8px; background: ${isConfigured ? '#1a4d1a' : '#4d1a1a'}; border-radius: 4px; margin-bottom: 8px;">
               <div style="color: ${isConfigured ? '#4ade80' : '#f87171'}; font-size: 12px; font-weight: bold;">
-                ${isConfigured ? '✓ OpenRouter Configured' : '✗ OpenRouter Not Configured'}
+                ${isConfigured ? `✓ ${serviceName} Configured` : `✗ ${serviceName} Not Configured`}
               </div>
               <div style="color: #888; font-size: 10px; margin-top: 4px;">
                 ${isConfigured 
-                  ? `Model: ${openRouterSettings.model || 'Default'} | API Key: ${openRouterSettings.apiKey.substring(0, 8)}...`
-                  : 'Configure OpenRouter in Settings to use LLM nodes'
+                  ? useLmStudio
+                    ? `Base URL: ${aiSettings.baseUrl || 'http://localhost:1234/v1'}${aiSettings.model ? ` | Model: ${aiSettings.model}` : ' (using server default)'}`
+                    : `Model: ${aiSettings.model || 'Default'} | API Key: ${aiSettings.apiKey ? aiSettings.apiKey.substring(0, 8) + '...' : 'Not set'}`
+                  : `Configure ${serviceName} in Settings to use LLM nodes`
                 }
               </div>
             </div>
             <small style="color: #888; font-size: 10px;">
-              This node uses the global OpenRouter configuration from Settings.
-              ${!isConfigured ? 'Please enable and configure OpenRouter in the Settings panel.' : ''}
+              This node uses the global ${serviceName} configuration from Settings.
+              ${!isConfigured ? `Please enable and configure ${serviceName} in the Settings panel.` : ''}
             </small>
           </div>
         `;
@@ -7876,6 +7893,17 @@ async function loadAiAnalysisSettings() {
     document.getElementById('settingsOpenRouterModel').value = openRouterModel;
     document.getElementById('settingsOpenRouterBaseUrl').value = openRouterBaseUrl;
     
+    // Load LM Studio settings
+    const lmStudioEnabled = window.settingsManager.get('ai.lmStudio.enabled') || false;
+    const lmStudioApiKey = window.settingsManager.get('ai.lmStudio.apiKey') || '';
+    const lmStudioModel = window.settingsManager.get('ai.lmStudio.model') || '';
+    const lmStudioBaseUrl = window.settingsManager.get('ai.lmStudio.baseUrl') || 'http://localhost:1234/v1';
+    
+    document.getElementById('settingsLmStudioEnabled').value = lmStudioEnabled ? 'true' : 'false';
+    document.getElementById('settingsLmStudioApiKey').value = lmStudioApiKey;
+    document.getElementById('settingsLmStudioModel').value = lmStudioModel;
+    document.getElementById('settingsLmStudioBaseUrl').value = lmStudioBaseUrl;
+    
     // Load Alpha Vantage settings
     const alphaVantageEnabled = window.settingsManager.get('ai.alphavantage.enabled') || false;
     const alphaVantageApiKey = window.settingsManager.get('ai.alphavantage.apiKey') || '';
@@ -7919,6 +7947,12 @@ async function saveAiAnalysisSettings() {
     const openRouterModel = document.getElementById('settingsOpenRouterModel').value;
     const openRouterBaseUrl = document.getElementById('settingsOpenRouterBaseUrl').value;
     
+    // Save LM Studio settings
+    const lmStudioEnabled = document.getElementById('settingsLmStudioEnabled').value === 'true';
+    const lmStudioApiKey = document.getElementById('settingsLmStudioApiKey').value;
+    const lmStudioModel = document.getElementById('settingsLmStudioModel').value;
+    const lmStudioBaseUrl = document.getElementById('settingsLmStudioBaseUrl').value;
+    
     // Save Alpha Vantage settings
     const alphaVantageEnabled = document.getElementById('settingsAlphaVantageEnabled').value === 'true';
     const alphaVantageApiKey = document.getElementById('settingsAlphaVantageApiKey').value;
@@ -7940,6 +7974,10 @@ async function saveAiAnalysisSettings() {
       'ai.openRouter.apiKey': openRouterApiKey,
       'ai.openRouter.model': openRouterModel,
       'ai.openRouter.baseUrl': openRouterBaseUrl,
+      'ai.lmStudio.enabled': lmStudioEnabled,
+      'ai.lmStudio.apiKey': lmStudioApiKey,
+      'ai.lmStudio.model': lmStudioModel,
+      'ai.lmStudio.baseUrl': lmStudioBaseUrl,
       'ai.alphavantage.enabled': alphaVantageEnabled,
       'ai.alphavantage.apiKey': alphaVantageApiKey,
       'ai.alphavantage.baseUrl': alphaVantageBaseUrl,
@@ -7966,6 +8004,10 @@ function setupAiAnalysisChangeTracking() {
     'settingsOpenRouterApiKey',
     'settingsOpenRouterModel',
     'settingsOpenRouterBaseUrl',
+    'settingsLmStudioEnabled',
+    'settingsLmStudioApiKey',
+    'settingsLmStudioModel',
+    'settingsLmStudioBaseUrl',
     'settingsAlphaVantageEnabled',
     'settingsAlphaVantageApiKey',
     'settingsAlphaVantageBaseUrl',

@@ -963,7 +963,47 @@
               <small>OpenRouter API endpoint</small>
             </div>
           </div>
-          
+        </div>
+        
+        <div class="notification-config-section">
+          <h4>🖥️ LM Studio Configuration (Local)</h4>
+          <div class="twilio-grid">
+            <div class="form-group">
+              <label>API Key (Optional):</label>
+              <div style="display: flex; gap: 5px; align-items: center;">
+                <input type="password" id="settingsLmStudioApiKey" placeholder="lm-studio (optional)" style="flex: 1;">
+                <button type="button" class="btn btn-small btn-secondary show-key-btn" data-target="settingsLmStudioApiKey" title="Show/Hide Key">👁️</button>
+              </div>
+              <small>LM Studio API key (usually not required, can be empty or "lm-studio")</small>
+            </div>
+            <div class="form-group">
+              <label>Enable LM Studio:</label>
+              <select id="settingsLmStudioEnabled">
+                <option value="false">Disabled</option>
+                <option value="true">Enabled</option>
+              </select>
+            </div>
+          </div>
+          <div class="twilio-grid">
+            <div class="form-group">
+              <label>Model Name:</label>
+              <input 
+                type="text" 
+                id="settingsLmStudioModel" 
+                placeholder="Leave empty to use server default"
+                style="width: 100%; padding: 6px; margin-top: 4px;"
+              />
+              <small>Model name from LM Studio (leave empty to use server default)</small>
+            </div>
+            <div class="form-group">
+              <label>Base URL:</label>
+              <input type="text" id="settingsLmStudioBaseUrl" placeholder="http://localhost:1234/v1" value="http://localhost:1234/v1">
+              <small>LM Studio local API endpoint (default: http://localhost:1234/v1)</small>
+            </div>
+          </div>
+        </div>
+        
+        <div class="notification-config-section">
           <div class="form-group">
             <label>AI Analysis Features:</label>
             <div class="checkbox-group twilio-checkbox-grid">

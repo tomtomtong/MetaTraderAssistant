@@ -20,6 +20,12 @@ class SettingsManager {
           model: 'anthropic/claude-3.5-sonnet',
           baseUrl: 'https://openrouter.ai/api/v1'
         },
+        lmStudio: {
+          enabled: false,
+          apiKey: '',
+          model: '',
+          baseUrl: 'http://localhost:1234/v1'
+        },
         alphavantage: {
           enabled: false,
           apiKey: '',
