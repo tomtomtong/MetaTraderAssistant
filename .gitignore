@@ -30,4 +30,11 @@ env/
 *.log
 npm-debug.log*
 
+# User settings and data files
+app_settings.json
+simulator_positions.json
+trade_journal.json
+balance_history.json
+chart_images.json
+
 
